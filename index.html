@@ -1,0 +1,4086 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>VOIDBOUND: Last Horizon</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap');
+
+:root{
+  --void:#070a12;
+  --void-2:#0b0f1c;
+  --panel:#111a2c;
+  --panel-2:#16233b;
+  --line: rgba(126,156,206,0.16);
+  --line-strong: rgba(126,156,206,0.32);
+  --cyan:#4fd8e8;
+  --cyan-dim: rgba(79,216,232,0.28);
+  --amber:#ff9f4a;
+  --violet:#b98cf0;
+  --danger:#ff4d5e;
+  --good:#5cd98a;
+  --text:#e9eefb;
+  --text-dim:#8a97b3;
+  --text-faint:#5c6885;
+  --font-d: 'Space Grotesk', sans-serif;
+  --font-h: 'Rajdhani', sans-serif;
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body{ height:100%; overflow:hidden; background:var(--void); color:var(--text); font-family:var(--font-d); }
+body{ position:fixed; inset:0; touch-action:none; user-select:none; }
+
+#app{ position:fixed; inset:0; overflow:hidden; }
+
+canvas{ position:absolute; inset:0; display:block; width:100%; height:100%; }
+#bg-canvas{ z-index:1; }
+#game-canvas{ z-index:5; }
+#fx-canvas{ z-index:20; pointer-events:none; }
+
+.screen{
+  position:absolute; inset:0; z-index:40;
+  display:none; flex-direction:column;
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen.active{ display:flex; }
+
+/* ---------- shared UI atoms ---------- */
+.wrap{ width:100%; max-width:920px; margin:0 auto; padding: 24px 22px 40px; }
+.eyebrow{ font-family:var(--font-h); letter-spacing:.14em; font-size:12.5px; color:var(--cyan); font-weight:600; }
+h1.title{ font-family:var(--font-d); font-weight:700; letter-spacing:-0.01em; font-size:clamp(30px,6vw,52px); line-height:1.02; }
+h2.section-title{ font-family:var(--font-d); font-weight:600; font-size:clamp(20px,3.4vw,26px); margin-bottom:4px; }
+p.lead{ color:var(--text-dim); font-size:15px; line-height:1.55; max-width:60ch; }
+
+.btn{
+  font-family:var(--font-h); font-weight:600; letter-spacing:.04em; font-size:15px;
+  color:var(--text); background:var(--panel-2); border:1px solid var(--line-strong);
+  padding:13px 26px; border-radius:3px; cursor:pointer; position:relative;
+  transition: border-color .15s ease, background .15s ease, transform .08s ease;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.btn:hover{ border-color:var(--cyan); background:#1a2740; }
+.btn:active{ transform: scale(.98); }
+.btn.primary{ background: linear-gradient(180deg, rgba(79,216,232,.22), rgba(79,216,232,.08)); border-color:var(--cyan); color:#eafcff; }
+.btn.primary:hover{ background: linear-gradient(180deg, rgba(79,216,232,.32), rgba(79,216,232,.12)); }
+.btn.danger{ border-color: rgba(255,77,94,.55); }
+.btn.danger:hover{ border-color:var(--danger); background:rgba(255,77,94,.12); }
+.btn:disabled{ opacity:.35; cursor:not-allowed; }
+.btn:disabled:hover{ border-color:var(--line-strong); background:var(--panel-2); }
+.btn.small{ padding:8px 16px; font-size:13px; }
+.btn.ghost{ background:transparent; }
+
+.panel{ background:var(--panel); border:1px solid var(--line); border-radius:2px; padding:20px; }
+
+.statbar-row{ display:flex; align-items:center; gap:10px; font-family:var(--font-h); font-size:13px; margin:7px 0; }
+.statbar-label{ width:96px; color:var(--text-dim); flex-shrink:0; letter-spacing:.03em; }
+.statbar-track{ flex:1; height:7px; background:#0b1122; border:1px solid var(--line); border-radius:1px; overflow:hidden; }
+.statbar-fill{ height:100%; background:linear-gradient(90deg, var(--cyan), var(--violet)); }
+.statbar-val{ width:34px; text-align:right; color:var(--text-faint); font-size:12px; }
+
+::-webkit-scrollbar{ width:8px; }
+::-webkit-scrollbar-thumb{ background:var(--panel-2); border-radius:4px; }
+::-webkit-scrollbar-track{ background:transparent; }
+
+/* ---------- INTRO ---------- */
+#screen-intro{ align-items:center; justify-content:center; background:var(--void); cursor:pointer; }
+#intro-text-wrap{ max-width:640px; padding:0 28px; text-align:center; min-height:180px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; }
+#intro-line{ font-family:var(--font-d); font-size:clamp(17px,3vw,23px); line-height:1.6; color:var(--text); opacity:0; transition:opacity 1.1s ease; }
+#intro-line.show{ opacity:1; }
+#intro-continue{ font-family:var(--font-h); font-weight:600; font-size:12.5px; letter-spacing:.14em; color:var(--cyan); opacity:0; }
+#intro-continue.show{ animation: introPulse 1.7s ease-in-out infinite; }
+@keyframes introPulse{ 0%,100%{ opacity:.38; } 50%{ opacity:1; } }
+#intro-logo{ text-align:center; opacity:0; transition:opacity 1.4s ease; cursor:default; }
+#intro-logo.show{ opacity:1; }
+#intro-logo .lg1{ font-family:var(--font-d); font-weight:700; font-size:clamp(34px,7vw,64px); letter-spacing:.02em; color:var(--text); }
+#intro-logo .lg2{ font-family:var(--font-h); font-weight:600; font-size:clamp(14px,2.4vw,20px); letter-spacing:.5em; color:var(--cyan); margin-top:6px; padding-left:.5em; }
+#cine-layer{ position:absolute; inset:0; z-index:36; display:none; cursor:pointer; }
+#cine-layer.active{ display:block; }
+#cine-text{ position:absolute; left:0; right:0; bottom:16%; text-align:center; padding:0 24px; font-family:var(--font-d); font-weight:700; font-size:clamp(20px,4.4vw,38px); letter-spacing:.06em; color:var(--text); text-shadow:0 0 24px rgba(79,216,232,.6); opacity:0; transition:opacity .9s ease; }
+#cine-text.show{ opacity:1; }
+#cine-skip{ position:absolute; bottom:22px; right:24px; font-family:var(--font-h); font-size:12px; color:var(--text-faint); letter-spacing:.08em; padding:10px; }
+#intro-skip{ position:absolute; bottom:26px; right:26px; font-family:var(--font-h); font-size:12px; color:var(--text-faint); letter-spacing:.08em; cursor:pointer; padding:10px; }
+#intro-begin{ margin-top:36px; opacity:0; transition:opacity 1s ease; cursor:default; }
+#intro-begin.show{ opacity:1; }
+
+/* ---------- MENU ---------- */
+#screen-menu{ align-items:center; justify-content:center; text-align:center; }
+#menu-box{ display:flex; flex-direction:column; gap:16px; align-items:center; padding:20px; }
+#menu-box .lg1{ font-family:var(--font-d); font-weight:700; font-size:clamp(30px,6vw,46px); }
+#menu-box .lg2{ font-family:var(--font-h); font-weight:600; font-size:clamp(12px,2vw,16px); letter-spacing:.5em; color:var(--cyan); margin:2px 0 26px 6px; }
+#menu-nav{ display:flex; flex-direction:column; gap:11px; width:240px; }
+#menu-version{ position:absolute; bottom:16px; left:20px; color:var(--text-faint); font-family:var(--font-h); font-size:11px; letter-spacing:.06em; }
+
+/* ---------- HANGAR / SHIP SELECT ---------- */
+.hangar-layout{ display:grid; grid-template-columns: 1fr; gap:18px; }
+#screen-hangar .wrap{ max-width:1060px; }
+#hangar-launch-row{ display:flex; justify-content:flex-end; margin-top:22px; }
+@media(min-width:760px){ .hangar-layout{ grid-template-columns: minmax(200px,240px) minmax(0,1fr); align-items:start; } }
+/* ship info panel: ship on the left, stats / description / lore on the right */
+.sd-grid{ display:grid; grid-template-columns:minmax(130px,min(300px,40%)) minmax(0,1fr); gap:20px; align-items:start; }
+.sd-ship{ text-align:center; }
+.sd-ship .ship-detail-name{ margin-top:6px; }
+.sd-handling{ font-size:12px; color:var(--text-faint); font-family:var(--font-h); letter-spacing:.05em; }
+.sd-hint{ color:var(--text-faint); font-family:var(--font-h); font-size:10.5px; letter-spacing:.05em; }
+#sd-static{ position:static; display:block; width:122px; height:122px; margin:0 auto 4px; border:1px solid var(--line); background:radial-gradient(circle at 50% 55%, rgba(79,216,232,.14), transparent 70%); }
+.sd-info .lead{ font-size:14px; }
+.sd-info .statbar-row{ margin:5px 0; }
+.ship-list{ display:flex; flex-direction:column; gap:8px; }
+.ship-card{ display:flex; align-items:center; gap:14px; padding:12px 14px; border:1px solid var(--line); background:var(--panel); cursor:pointer; border-radius:2px; }
+.ship-card.selected{ border-color:var(--cyan); background:#132133; }
+.ship-glyph{ width:46px; height:46px; flex-shrink:0; position:static; }
+.ship-name{ font-family:var(--font-h); font-weight:700; letter-spacing:.03em; font-size:16px; }
+.ship-tag{ font-size:12px; color:var(--text-dim); }
+.ship-detail-name{ font-family:var(--font-d); font-weight:700; font-size:24px; }
+.ctl-row{ display:flex; align-items:center; gap:14px; padding:12px 0; border-bottom:1px solid var(--line); }
+.ctl-row:last-child{ border-bottom:none; }
+.ctl-label{ width:128px; flex-shrink:0; font-family:var(--font-h); font-weight:700; letter-spacing:.06em; font-size:12.5px; color:var(--text-dim); }
+.ctl-keys{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.ctl-key{ font-family:var(--font-h); font-weight:700; font-size:14px; letter-spacing:.04em; color:var(--cyan); border:1px solid var(--cyan); background:rgba(79,216,232,.10); padding:5px 11px; border-radius:3px; min-width:34px; text-align:center; }
+.ctl-note{ font-size:12.5px; color:var(--text-dim); line-height:1.4; flex-basis:100%; }
+.ship-detail-special{ color:var(--amber); font-size:13px; font-family:var(--font-h); margin-top:4px; margin-bottom:14px; }
+@media(max-width:759px){
+  .ship-list{ flex-direction:row; flex-wrap:wrap; gap:6px; }
+  .ship-card{ flex:1 1 calc(33.333% - 6px); min-width:0; flex-direction:column; text-align:center; gap:4px; padding:10px 6px; }
+  .ship-tag{ font-size:10.5px; }
+  .ship-name{ font-size:14px; }
+  #hangar-launch-row{ position:sticky; bottom:0; z-index:2; padding:10px 0 12px; margin-top:12px; background:linear-gradient(to top, var(--void) 70%, rgba(7,10,18,0)); }
+}
+@media(min-width:760px) and (max-height:780px){ .ship-card{ padding:8px 12px; } }   /* avoid vertical scroll on short laptop screens */
+@media(max-height:560px){                                                       /* landscape phones: keep EMBARCAR reachable */
+  #hangar-launch-row{ position:sticky; bottom:0; z-index:2; padding:8px 0 10px; margin-top:10px; background:linear-gradient(to top, var(--void) 70%, rgba(7,10,18,0)); }
+}
+@media(max-width:559px){
+  .sd-grid{ grid-template-columns:minmax(0,1fr); gap:14px; }
+  #hangar-viewer-canvas{ max-width:240px !important; }
+}
+
+/* ---------- PLANET / LANDING ---------- */
+#planet-hero{ height:150px; position:relative; overflow:hidden; flex-shrink:0; }
+#planet-hero canvas{ position:absolute; inset:0; }
+.planet-progress{ display:flex; gap:5px; margin:14px 0 4px; flex-wrap:wrap; }
+.pp-dot{ width:22px; height:5px; border-radius:2px; background:var(--panel-2); border:1px solid var(--line); }
+.pp-dot.done{ background:var(--cyan); border-color:var(--cyan); }
+.pp-dot.current{ background:var(--amber); border-color:var(--amber); }
+.tabs{ display:flex; gap:6px; border-bottom:1px solid var(--line); margin:18px 0 16px; }
+.tab-btn{ font-family:var(--font-h); font-weight:600; letter-spacing:.04em; font-size:13.5px; color:var(--text-dim); background:none; border:none; padding:10px 4px; cursor:pointer; border-bottom:2px solid transparent; }
+.tab-btn.active{ color:var(--text); border-color:var(--cyan); }
+.upgrade-row{ display:flex; align-items:center; gap:14px; padding:13px 14px; border:1px solid var(--line); background:var(--panel); border-radius:2px; margin-bottom:8px; }
+.upg-icon{ width:34px; height:34px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.upg-info{ flex:1; min-width:0; }
+.upg-name{ font-family:var(--font-h); font-weight:600; font-size:14.5px; }
+.upg-lvl{ font-size:12px; color:var(--text-dim); }
+.upg-cost{ font-family:var(--font-h); font-size:13px; color:var(--text-dim); white-space:nowrap; }
+.upg-cost.afford{ color:var(--good); }
+
+/* ---------- HUD (travel/boss) ---------- */
+#hud{ position:absolute; inset:0; z-index:30; pointer-events:none; display:none; }
+#hud.active{ display:block; }
+#hud-top{ position:absolute; top:0; left:0; right:0; padding: max(12px, env(safe-area-inset-top)) 16px 0; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+#hud-bars{ display:flex; flex-direction:column; gap:5px; width:210px; }
+.hud-bar-row{ display:flex; align-items:center; gap:7px; }
+.hud-bar-label{ font-family:var(--font-h); font-size:10.5px; width:16px; color:var(--text-dim); font-weight:700; }
+.hud-bar-track{ flex:1; height:9px; background:rgba(6,10,18,.7); border:1px solid var(--line-strong); position:relative; }
+.hud-bar-fill{ height:100%; transition: width .15s ease; }
+.hud-bar-fill.hp{ background: linear-gradient(90deg,#ff6b5e,#ff9f4a); }
+.hud-bar-fill.sh{ background: linear-gradient(90deg,#4fd8e8,#6ee8f5); }
+#hud-credits{ font-family:var(--font-h); font-weight:700; font-size:15px; color:var(--amber); background:rgba(6,10,18,.6); border:1px solid var(--line); padding:5px 12px; border-radius:2px; }
+#hud-pause-btn{ pointer-events:auto; background:rgba(6,10,18,.6); border:1px solid var(--line); color:var(--text-dim); width:34px; height:34px; border-radius:2px; font-size:16px; cursor:pointer; }
+#hud-planet-label{ position:absolute; top:max(80px, calc(env(safe-area-inset-top) + 68px)); left:16px; font-family:var(--font-h); font-size:12px; letter-spacing:.08em; color:var(--text-dim); }
+#hud-msg{ position:absolute; top:38%; left:0; right:0; text-align:center; font-family:var(--font-d); font-weight:700; font-size:clamp(20px,4vw,32px); color:var(--text); opacity:0; transition:opacity .4s ease; letter-spacing:.02em; text-shadow:0 0 24px rgba(79,216,232,.5); }
+#hud-msg.show{ opacity:1; }
+#boss-bar-wrap{ position:absolute; top:max(12px, env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(560px,86vw); display:none; }
+#boss-bar-wrap.active{ display:block; }
+#boss-name{ text-align:center; font-family:var(--font-h); font-weight:700; letter-spacing:.16em; font-size:13px; color:var(--danger); margin-bottom:4px; }
+#boss-bar-track{ height:11px; background:rgba(6,10,18,.75); border:1px solid rgba(255,77,94,.5); position:relative; }
+#boss-bar-fill{ height:100%; background:linear-gradient(90deg,#ff4d5e,#ff9f4a); transition:width .2s ease; }
+#boss-phase-label{ text-align:center; font-family:var(--font-h); font-size:11px; color:var(--text-faint); margin-top:3px; letter-spacing:.06em; }
+
+/* ---------- touch controls ---------- */
+#touch-controls{ position:absolute; inset:0; z-index:35; display:none; pointer-events:none; }
+#touch-controls.active{ display:block; }
+#tc-stick-zone{ position:absolute; left:max(18px, env(safe-area-inset-left)); bottom:max(18px, env(safe-area-inset-bottom)); width:130px; height:130px; pointer-events:auto; }
+#tc-stick-base{ position:absolute; inset:0; border-radius:50%; background:rgba(20,28,46,.55); border:1px solid var(--line-strong); }
+#tc-stick-nub{ position:absolute; width:52px; height:52px; border-radius:50%; background:rgba(79,216,232,.35); border:1px solid var(--cyan); left:50%; top:50%; transform:translate(-50%,-50%); }
+#tc-fire-btn{ position:absolute; right:max(24px, env(safe-area-inset-right)); bottom:max(30px, env(safe-area-inset-bottom)); width:88px; height:88px; border-radius:50%; background:rgba(255,159,74,.22); border:1px solid var(--amber); pointer-events:auto; display:flex; align-items:center; justify-content:center; font-family:var(--font-h); font-weight:700; letter-spacing:.05em; font-size:13px; color:var(--amber); }
+#tc-fire-btn.pressed{ background:rgba(255,159,74,.45); }
+#tc-special-btn{ position:absolute; right:max(34px, env(safe-area-inset-right)); bottom:calc(max(30px, env(safe-area-inset-bottom)) + 100px); width:68px; height:68px; border-radius:50%; background:rgba(79,216,232,.16); border:1px solid var(--cyan); pointer-events:auto; display:flex; align-items:center; justify-content:center; text-align:center; font-family:var(--font-h); font-weight:700; letter-spacing:.04em; font-size:11px; line-height:1.1; color:var(--cyan); }
+#tc-special-btn.ready{ background:rgba(79,216,232,.30); box-shadow:0 0 14px rgba(79,216,232,.6); animation:spReady 1.1s ease-in-out infinite; }
+#tc-special-btn.cooling{ color:var(--text-dim); border-color:var(--line-strong); font-size:15px; }
+#tc-special-btn.active{ color:#fff; border-color:var(--violet); background:rgba(185,140,240,.35); }
+@keyframes spReady{ 0%,100%{ box-shadow:0 0 8px rgba(79,216,232,.35); } 50%{ box-shadow:0 0 18px rgba(79,216,232,.8); } }
+#hud-special{ margin-top:3px; }
+.hs-top{ display:flex; justify-content:space-between; font-family:var(--font-h); font-size:10.5px; letter-spacing:.06em; color:var(--text-dim); margin-bottom:2px; }
+#hs-state{ font-weight:700; color:var(--amber); }
+.hs-track{ height:6px; background:rgba(6,10,18,.7); border:1px solid var(--line-strong); }
+#hs-fill{ height:100%; width:0; background:var(--amber); }
+#hud-special.ready #hs-fill{ background:var(--cyan); box-shadow:0 0 8px rgba(79,216,232,.7); }
+#hud-special.ready #hs-state{ color:var(--cyan); }
+#hud-special.active #hs-fill{ background:var(--violet); }
+#hud-special.active #hs-state{ color:var(--violet); }
+
+/* ---------- pause / gameover / victory overlays ---------- */
+.overlay-screen{ align-items:center; justify-content:center; background:rgba(5,8,14,.88); backdrop-filter: blur(3px); text-align:center; }
+.overlay-box{ display:flex; flex-direction:column; align-items:center; gap:16px; padding:30px; max-width:420px; }
+.overlay-title{ font-family:var(--font-d); font-weight:700; font-size:clamp(26px,5vw,38px); }
+.overlay-title.win{ color:var(--good); }
+.overlay-title.lose{ color:var(--danger); }
+#gameover-stats, #victory-stats{ display:grid; grid-template-columns:1fr 1fr; gap:8px 22px; width:100%; margin:6px 0 8px; }
+.mini-stat{ text-align:left; border-top:1px solid var(--line); padding-top:8px; }
+.mini-stat-label{ font-size:11px; color:var(--text-faint); font-family:var(--font-h); letter-spacing:.05em; }
+.mini-stat-val{ font-family:var(--font-h); font-weight:700; font-size:17px; color:var(--text); }
+
+/* ---------- options ---------- */
+.slider-row{ display:flex; align-items:center; gap:14px; margin:16px 0; flex-wrap:wrap; }
+.slider-row label{ width:110px; font-family:var(--font-h); font-size:13px; color:var(--text-dim); }
+.slider-row input[type=range]{ flex:1; min-width:110px; accent-color:var(--cyan); }
+.mute-btn{ flex-shrink:0; white-space:nowrap; font-size:11.5px; padding:8px 14px; }
+.mute-btn.active{ border-color:var(--danger); color:var(--danger); background:rgba(255,77,94,.1); }
+
+.topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.back-link{ font-family:var(--font-h); font-size:12.5px; color:var(--text-dim); cursor:pointer; letter-spacing:.05em; }
+.back-link:hover{ color:var(--cyan); }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="bg-canvas"></canvas>
+  <canvas id="game-canvas"></canvas>
+  <canvas id="fx-canvas"></canvas>
+
+  <!-- INTRO -->
+  <div class="screen" id="screen-intro">
+    <div id="intro-text-wrap">
+      <div id="intro-line"></div>
+      <div id="intro-continue">Pulsa para continuar ▸</div>
+    </div>
+    <div id="intro-logo">
+      <div class="lg1">VOIDBOUND</div>
+      <div class="lg2">LAST HORIZON</div>
+      <div id="intro-begin"><button class="btn primary" id="btn-begin">COMENZAR</button></div>
+    </div>
+    <div id="intro-skip">SALTAR ▸</div>
+  </div>
+
+  <!-- MENU -->
+  <div class="screen" id="screen-menu">
+    <div id="menu-box">
+      <div class="lg1">VOIDBOUND</div>
+      <div class="lg2">LAST HORIZON</div>
+      <div id="menu-nav">
+        <button class="btn primary" id="btn-jugar">JUGAR</button>
+        <button class="btn" id="btn-continuar">CONTINUAR</button>
+        <button class="btn" id="btn-hangar-menu">HANGAR</button>
+        <button class="btn" id="btn-opciones">OPCIONES</button>
+      </div>
+    </div>
+    <div id="menu-version">VOIDBOUND: LAST HORIZON — v1.0 MVP</div>
+  </div>
+
+  <!-- HANGAR (ship select) -->
+  <div class="screen" id="screen-hangar">
+    <div class="wrap">
+      <div class="topbar"><span class="back-link" id="hangar-back">◂ VOLVER</span></div>
+      <div class="eyebrow">HANGAR</div>
+      <h1 class="title" id="hangar-title" style="font-size:clamp(24px,4vw,34px);margin-bottom:6px;">Selecciona tu nave</h1>
+      <p class="lead" id="hangar-subtitle" style="margin-bottom:20px;">Cada nave ofrece un estilo de combate distinto. Elige la que se adapte a tu forma de pilotar.</p>
+      <div class="hangar-layout">
+        <div class="ship-list" id="ship-list"></div>
+        <div class="panel" id="ship-detail"></div>
+      </div>
+      <div id="hangar-launch-row" style="margin-top:22px; display:flex; justify-content:flex-end;">
+        <button class="btn primary" id="btn-launch-campaign">EMBARCAR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANET / LANDING -->
+  <!-- CONTROLS BRIEFING (shown after EMBARCAR, before the first battle) -->
+  <div class="screen" id="screen-controls">
+    <div class="wrap" style="max-width:600px;">
+      <div class="eyebrow">ANTES DEL COMBATE</div>
+      <h1 class="title" id="ctl-title" style="font-size:clamp(24px,4vw,34px);margin-bottom:6px;">Controles</h1>
+      <p class="lead" id="ctl-sub" style="margin-bottom:18px;"></p>
+      <div class="panel" id="ctl-list"></div>
+      <div style="margin-top:22px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <button class="btn ghost" id="btn-controls-back">◂ VOLVER</button>
+        <button class="btn primary" id="btn-controls-start">COMENZAR</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-planet">
+    <div id="planet-hero"><canvas id="planet-hero-canvas"></canvas></div>
+    <div class="wrap" style="padding-top:18px;">
+      <div class="topbar">
+        <span class="back-link" id="planet-menu-link">◂ MENÚ</span>
+        <span id="hud-credits-planet" style="font-family:var(--font-h);font-weight:700;color:var(--amber);"></span>
+      </div>
+      <div class="eyebrow" id="planet-eyebrow">PLANETA</div>
+      <h1 class="title" id="planet-name" style="font-size:clamp(26px,4.6vw,38px);"></h1>
+      <p class="lead" id="planet-desc" style="margin-top:6px;"></p>
+      <div class="planet-progress" id="planet-progress"></div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="upgrades">HANGAR / UPGRADES</button>
+        <button class="tab-btn" data-tab="info">SISTEMA</button>
+      </div>
+      <div id="tab-upgrades"></div>
+      <div id="tab-info" style="display:none;"></div>
+      <div style="margin-top:26px; display:flex; justify-content:flex-end; gap:10px;">
+        <button class="btn primary" id="btn-depart">PARTIR ▸</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTIONS -->
+  <div class="screen" id="screen-options">
+    <div class="wrap">
+      <div class="topbar"><span class="back-link" id="options-back">◂ VOLVER</span></div>
+      <div class="eyebrow">SISTEMA</div>
+      <h1 class="title" style="font-size:clamp(24px,4vw,34px);margin-bottom:18px;">Opciones</h1>
+      <div class="panel">
+        <div class="slider-row"><label>MASTER</label><input type="range" id="vol-master" min="0" max="100" value="80"></div>
+        <div class="slider-row"><label>MÚSICA</label><input type="range" id="vol-music" min="0" max="100" value="60"><button class="btn small mute-btn" id="btn-mute-music">SILENCIAR MÚSICA</button></div>
+        <div class="slider-row"><label>SFX</label><input type="range" id="vol-sfx" min="0" max="100" value="85"><button class="btn small mute-btn" id="btn-mute-sfx">SILENCIAR SFX</button></div>
+      </div>
+      <div class="panel" style="margin-top:16px;">
+        <h2 class="section-title" style="margin-bottom:10px;">Partida</h2>
+        <div id="reset-save-normal">
+          <button class="btn danger small" id="btn-reset-save">BORRAR PARTIDA GUARDADA</button>
+        </div>
+        <div id="reset-save-confirm" style="display:none;">
+          <p class="lead" style="margin-bottom:12px;">¿Seguro? Esta acción no se puede deshacer.</p>
+          <button class="btn danger small" id="btn-reset-save-yes">SÍ, BORRAR</button>
+          <button class="btn small" id="btn-reset-save-cancel">CANCELAR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME HUD -->
+  <div id="hud">
+    <div id="hud-top">
+      <div id="hud-bars">
+        <div class="hud-bar-row"><span class="hud-bar-label">HP</span><div class="hud-bar-track"><div class="hud-bar-fill hp" id="bar-hp" style="width:100%"></div></div></div>
+        <div class="hud-bar-row"><span class="hud-bar-label">SH</span><div class="hud-bar-track"><div class="hud-bar-fill sh" id="bar-sh" style="width:100%"></div></div></div>
+        <div id="hud-special"><div class="hs-top"><span id="hs-name">SPECIAL</span><span id="hs-state">LISTO</span></div><div class="hs-track"><div id="hs-fill"></div></div></div>
+      </div>
+      <div id="hud-credits">0 CR</div>
+      <button id="hud-pause-btn">⏸</button>
+    </div>
+    <div id="hud-planet-label"></div>
+    <div id="hud-msg"></div>
+    <div id="boss-bar-wrap">
+      <div id="boss-name">THE WORLDBREAKER</div>
+      <div id="boss-bar-track"><div id="boss-bar-fill" style="width:100%"></div></div>
+      <div id="boss-phase-label"></div>
+    </div>
+  </div>
+
+  <!-- touch controls -->
+  <div id="touch-controls">
+    <div id="tc-stick-zone"><div id="tc-stick-base"></div><div id="tc-stick-nub"></div></div>
+    <div id="tc-fire-btn">FUEGO</div>
+    <div id="tc-special-btn">SPECIAL</div>
+  </div>
+  <div id="cine-layer"><div id="cine-text"></div><div id="cine-skip">SALTAR ▸</div></div>
+
+  <!-- PAUSE -->
+  <div class="screen overlay-screen" id="screen-pause">
+    <div class="overlay-box">
+      <div class="overlay-title">PAUSA</div>
+      <button class="btn primary" id="btn-resume" style="width:220px;">REANUDAR</button>
+      <button class="btn" id="btn-pause-options" style="width:220px;">OPCIONES</button>
+      <button class="btn danger" id="btn-pause-menu" style="width:220px;">SALIR AL MENÚ</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="screen overlay-screen" id="screen-gameover">
+    <div class="overlay-box">
+      <div class="overlay-title lose">GAME OVER</div>
+      <p class="lead" style="text-align:center;">Tu nave ha sido destruida antes de alcanzar el siguiente mundo.</p>
+      <div id="gameover-stats"></div>
+      <button class="btn primary" id="btn-retry" style="width:220px;">REINTENTAR</button>
+      <button class="btn" id="btn-gameover-menu" style="width:220px;">VOLVER AL MENÚ</button>
+    </div>
+  </div>
+
+  <!-- VICTORY / FINAL -->
+  <div class="screen overlay-screen" id="screen-victory">
+    <div class="overlay-box">
+      <div class="overlay-title win">MISIÓN COMPLETADA</div>
+      <p class="lead" style="text-align:center;">LA GALAXIA HA SOBREVIVIDO</p>
+      <div id="victory-stats"></div>
+      <button class="btn primary" id="btn-play-again" style="width:220px;">JUGAR DE NUEVO</button>
+      <button class="btn" id="btn-victory-menu" style="width:220px;">MENÚ PRINCIPAL</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================================
+   VOIDBOUND: LAST HORIZON — game data
+   Proyecto 100% original. Ninguna referencia a Star Wars u otra franquicia.
+   ========================================================================= */
+
+const SHIPS = [
+  { id:'vanguard', name:'VANGUARD', tag:'Equilibrada', desc:'Un caza multipropósito fiable, sin puntos débiles evidentes. La elección segura para cualquier piloto.',
+    maxHealth:100, maxShield:100, moveSpeed:100, fireRate:100, damage:100, range:100, handling:'Media',
+    special:'Equilibrio general en todas las áreas.', color:'#4fd8e8', accent:'#8be9f2',
+    lore:'Construida en los astilleros fronterizos de Veyra, la Vanguard fue el primer caza que el protagonista pilotó junto a su padre. No destaca en nada, pero nunca falla.' },
+  { id:'phantom', name:'PHANTOM', tag:'Interceptor veloz', desc:'Casco ligero construido para esquivar antes que resistir. Recompensa el pilotaje agresivo y preciso.',
+    maxHealth:70, maxShield:70, moveSpeed:140, fireRate:120, damage:80, range:100, handling:'Sensible',
+    special:'Movimiento rápido y gran capacidad de evasión.', color:'#b98cf0', accent:'#d6b8fa',
+    lore:'Diseñada por contrabandistas para burlar bloqueos imperiales, la Phantom cambia blindaje por velocidad pura. Quien la doma, ya no vuelve a sentirse a salvo en un caza lento.' },
+  { id:'titan', name:'TITAN', tag:'Acorazado pesado', desc:'Blindaje macizo pensado para absorber castigo. Lento, pero prácticamente imposible de derribar rápido.',
+    maxHealth:150, maxShield:150, moveSpeed:65, fireRate:75, damage:140, range:110, handling:'Pesada',
+    special:'Gran resistencia estructural.', color:'#ff9f4a', accent:'#ffc98f',
+    lore:'Un casco de minería reconvertido en nave de guerra en el astillero en ruinas de Dravox. Demasiado pesado para huir, así que sus pilotos aprenden a no necesitarlo.' },
+  { id:'razor', name:'RAZOR', tag:'Asalto ofensivo', desc:'Optimizada para saturar el espacio de proyectiles. Poco blindaje, pero una cadencia devastadora.',
+    maxHealth:80, maxShield:80, moveSpeed:110, fireRate:150, damage:120, range:90, handling:'Ágil',
+    special:'Cadencia de disparo elevada.', color:'#ff4d5e', accent:'#ff8791',
+    lore:'Nacida en los talleres clandestinos de Noxara, la Razor sacrifica todo lo que no sea fuego. Sus rivales rara vez sobreviven el tiempo suficiente para notar lo frágil que es.' },
+  { id:'oracle', name:'ORACLE', tag:'Soporte técnico', desc:'Sistemas de puntería avanzados que extienden el alcance efectivo mucho más allá de lo habitual.',
+    maxHealth:90, maxShield:110, moveSpeed:95, fireRate:100, damage:100, range:150, handling:'Estable',
+    special:'Mayor alcance y control de disparo.', color:'#5cd98a', accent:'#9bf0bc',
+    lore:'Heredera de los sistemas de puntería que un ingeniero de Valtheris diseñó antes de ayudar, a su pesar, a construir The Worldbreaker. Ve más lejos que cualquier otra nave.' },
+  // SECRET reward ship: playable only once all five normal ships have been completed; it only
+  // becomes a permanent Hangar unlock after the game is completed with it.
+  { id:'eclipse', name:'ECLIPSE', tag:'Nave secreta', secret:true, desc:'Prototipo final, forjado con lo mejor de las cinco naves. Su núcleo curva el espacio a su alrededor.',
+    maxHealth:120, maxShield:130, moveSpeed:115, fireRate:115, damage:130, range:125, handling:'Maestra',
+    special:'Singularidad: un pozo gravitatorio que arrastra enemigos y absorbe proyectiles antes de estallar.', color:'#ffd34f', accent:'#fff0a8',
+    lore:'Los planos del padre no solo señalaban debilidades del Worldbreaker: guardaban un último diseño que ningún piloto se atrevió a construir. Solo quien ha vencido con cada caza merece pilotarla.' },
+];
+
+const PLANETS = [
+  { name:'Kharon',    color:'#ff9f4a', accent:'#3a2510', desc:'Un puesto minero fronterizo envuelto en polvo rojizo y actividad de contrabandistas.', tier:1 },
+  { name:'Solenne',   color:'#b98cf0', accent:'#241a3a', desc:'Ciudad-anillo suspendida sobre un océano de nubes violetas.', tier:2 },
+  { name:'Myridian',  color:'#5cd98a', accent:'#123a24', desc:'Selva orbital de biotecnología abandonada, ahora patrullada por drones hostiles.', tier:2 },
+  { name:'Dravox',    color:'#ff6b5e', accent:'#3a140f', desc:'Astillero militar en ruinas. Restos de guerra flotan entre sus torres oxidadas.', tier:3 },
+  { name:'Elysar',    color:'#4fa8e8', accent:'#0c2540', desc:'Estación glaciar donde el hielo cubre reactores todavía activos.', tier:3 },
+  { name:'Noxara',    color:'#e85c9e', accent:'#3a1128', desc:'Bazar estelar neón, territorio disputado por cazarrecompensas rivales.', tier:4 },
+  { name:'Valtheris', color:'#e8c84f', accent:'#3a2f0c', desc:'Fortaleza-templo tallada en un asteroide dorado. Aquí se ocultan los mejores mercenarios.', tier:4 },
+  { name:'Arken',     color:'#8c9ef0', accent:'#181d3a', desc:'El último bastión antes del vacío que ocupa The Worldbreaker. El silencio aquí es absoluto.', tier:5 },
+  // final destination: reached only after Arken -> BOSS; never a shop/landing stop
+  { name:'Veyra',     color:'#4fd8e8', accent:'#0b3a42', desc:'El mundo natal del protagonista, tranquilo y verde, por fin a salvo del Worldbreaker.', tier:5 },
+];
+
+const ENEMY_TYPES = {
+  scout:       { name:'Scout',       health:20,  damage:6,  speed:2.6, fireRate:0,    reward:8,  radius:14, behavior:'ram',    minTier:1 },
+  raider:      { name:'Raider',      health:42,  damage:9,  speed:1.7, fireRate:2000, reward:15, radius:17, behavior:'shoot',  minTier:1 },
+  gunship:     { name:'Gunship',     health:95,  damage:13, speed:0.85,fireRate:1500, reward:26, radius:22, behavior:'aim',    minTier:2 },
+  interceptor: { name:'Interceptor', health:35,  damage:11, speed:3.2, fireRate:0,    reward:20, radius:15, behavior:'zigzag', minTier:2 },
+  destroyer:   { name:'Destroyer',   health:230, damage:20, speed:0.55,fireRate:1200, reward:55, radius:32, behavior:'aim',    minTier:4 },
+};
+
+const UPGRADE_DEFS = [
+  { key:'hull',        name:'Hull',            desc:'Aumenta la vida máxima.',            icon:'hull' },
+  { key:'shield',      name:'Shield',          desc:'Aumenta el escudo máximo.',           icon:'shield' },
+  { key:'engine',      name:'Engine',          desc:'Aumenta la velocidad de movimiento.', icon:'engine' },
+  { key:'weapon',      name:'Weapon',          desc:'Aumenta el daño por disparo.',        icon:'weapon' },
+  { key:'firecontrol', name:'Fire Control',    desc:'Aumenta la cadencia de disparo.',     icon:'fire' },
+  { key:'targeting',   name:'Targeting',       desc:'Aumenta el alcance del disparo.',     icon:'target' },
+];
+
+const MAX_UPGRADE_LEVEL = 6;
+
+function upgradeCost(level){
+  // cost to go from `level` to `level+1` — cheap first steps, steep top levels (50, 90, 162, 292, 525),
+  // so a normal run can fully max about three upgrades, not all six
+  return Math.round(50 * Math.pow(1.8, level - 1));
+}
+
+function defaultSave(){
+  return {
+    shipId: null,
+    credits: 0,
+    upgrades: { hull:1, shield:1, engine:1, weapon:1, firecontrol:1, targeting:1 },
+    planetIndex: 0,           // index of currently landed planet (0 = Kharon ... 7 = Arken); 8 = Veyra / campaign complete
+    saveVersion: 2,           // 2 = planet order Kharon..Arken, BOSS, Veyra
+    bossDefeated: false,
+    stats: { enemiesDestroyed:0, asteroidsDestroyed:0, playTimeMs:0 },
+    audio: { master:80, music:60, sfx:85, muteMusic:false, muteSfx:false },
+    hasSave: false,
+  };
+}
+
+/* =========================================================================
+   PIXEL-ART SPRITE GRIDS (visual only — no gameplay data here)
+   Convention for *_HALF rows: index 0 = CENTER column ... last index = OUTER
+   EDGE column. The renderer mirrors each half-row horizontally to build the
+   full symmetric sprite. Row 0 = nose/front, last row = tail/rear.
+   ========================================================================= */
+const SHIP_SPRITE_GRIDS = {
+  vanguard: [
+    "L......","H......","HH.....","HHS....","CHS....","CHS....","HHS....",
+    "HHSH...","HHSHH..","HHSHHA.","HHSHHAA","HHSHHA.","HHSHH..","HHSH...",
+    "HHS....","HES....","HEES...","HEES...",".EE....","..E....",
+  ],
+  phantom: [
+    "L......","H......","H......","HS.....","HS.....","CS.....","CS.....",
+    "HS.....","HSA....","HSAA...","HSAAA..","HSAAAAA","HSAA...","HS.....",
+    "HS.....","HE.....","HE.....","EE.....","E......","E......",
+  ],
+  titan: [
+    "..L....","..H....",".HHS...",".HHS...","CHHS...","CHHS...","WHHSH..",
+    "WHHSHH.","WHHSHHS",".HHSHHS",".HHSHHS","WHHSHHS","WHHSHH.","WHHSH..",
+    ".HHS...",".HHS...","HEESH..","HEESHH.","HEESHH.",".EES...",
+  ],
+  razor: [
+    "L......","H......","HS.....","HS.....","CS.....","CSH....","HSHA...",
+    "HSHAW..","HSHAWA.","HSHAWAA","HSHAWA.","HSHAW..","HSHA...","HSH....",
+    "HS.....","HES....","HEES...",".EES...",".EE....","..E....",
+  ],
+  oracle: [
+    "..L....","..H....","..H....",".HAS...",".HAS...","CHDS...","CHDS...",
+    ".HDSH..",".HDSHA.",".HRSHA.",".HRSHA.",".HDSHA.",".HDSH..",".HDS...",
+    ".HES...",".HES...",".EES...",".EES...","..E....","..E....",
+  ],
+  eclipse: [
+    "L......","L......","HA.....","HAS....","CAS....","CHS....","RHSH...",
+    "RHSHA..","HHSHAAH","HHSHAAA","HDSHAAA","HDSHAA.","HHSHA..","HHSH...",
+    "HAS....","HES.A..","EES.AA.",".EE..A.",".E...A.",".E....A",
+  ],
+};
+
+const ENEMY_SPRITE_GRIDS = {
+  // enemies travel downward (toward the player): row0 = rear, last row = nose tip
+  scout:       { half:["H....","HS...","HSA..","HSAH.",".EH..","..H.."] },
+  raider:      { half:["H....","HS...","HSH..","HSHA.","HSHA.",".EWH.","..H.."] },
+  gunship:     { half:["..H..",".HHS.","WHHS.","WHHSA",".HHSA",".HHS.",".EES.","..WH."] },
+  interceptor: { half:["H....","HA...","HAS..","HASH.","HASHA",".EH..",".EH..","..H.."] },
+  destroyer:   { half:["..H....",".HHS...","WHHSH..","WHHSHH.","WHHSHHA",".HHSHHA",".HHSHH.",".HHSH..",".EESH..",".EESHH.","..WH..."] },
+};
+
+// Boss hull — a wide dreadnought silhouette, mirrored vertically (top half only, defined here).
+const BOSS_SPRITE_TOP = [
+  ".....SSSSSWSS...................",
+  "....WHHHHHHHHSS.................",
+  "...SHHHHHHHHHHHSW...............",
+  "..SHHHHHHHHHHHHHHSS.............",
+  "..HHHHHHHHHHHHHHHHHSS...........",
+  ".SHHHHHHHHHHHHHHHHHHHSWS........",
+  ".HHHHHPPPPPRRPPPPPPPPPPPSSS.....",
+  "SLLLLLLLLLLRRLLLLLLLLLLLLLLWSSSS",
+];
+/* =========================================================================
+   SAVE SYSTEM  (localStorage only — no backend, no accounts)
+   ========================================================================= */
+const SAVE_KEY = 'voidbound_lasthorizon_save_v1';
+
+const SaveManager = {
+  data: null,
+  load(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(!raw){ this.data = defaultSave(); return this.data; }
+      const parsed = JSON.parse(raw);
+      // merge with defaults to survive future added fields
+      this.data = Object.assign(defaultSave(), parsed);
+      if(parsed.saveVersion !== 2){ // old order had Veyra at index 0: shift in-progress campaigns by one
+        if(parsed.hasSave && !parsed.bossDefeated) this.data.planetIndex = Math.max(0, (parsed.planetIndex||0) - 1);
+        this.data.saveVersion = 2;
+      }
+      this.data.upgrades = Object.assign(defaultSave().upgrades, parsed.upgrades || {});
+      this.data.stats = Object.assign(defaultSave().stats, parsed.stats || {});
+      this.data.audio = Object.assign(defaultSave().audio, parsed.audio || {});
+      return this.data;
+    }catch(e){
+      console.warn('Save corrupta, iniciando nueva.', e);
+      this.data = defaultSave();
+      return this.data;
+    }
+  },
+  save(){
+    if(!this.data) return;
+    try{ localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); }
+    catch(e){ console.warn('No se pudo guardar la partida', e); }
+  },
+  // Reads localStorage directly (not `this.data`, which can be a stale in-memory
+  // reference) so this always reflects what is actually persisted right now.
+  // A campaign that has already beaten the Boss counts as finished, not "continuable".
+  hasSavedGame(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) return false;
+      const parsed = JSON.parse(raw);
+      return !!(parsed && parsed.hasSave && !parsed.bossDefeated);
+    }catch(e){
+      return false;
+    }
+  },
+  reset(){
+    this.data = defaultSave();
+    try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+    // Game keeps its own `save` reference (used throughout gameplay/UI code) which must
+    // always point to the same object as SaveManager.data — otherwise the old in-memory
+    // save survives the reset and can leak back via a later SaveManager.save() call.
+    if(typeof Game !== 'undefined' && Game) Game.save = this.data;
+  },
+  saveAudioOnly(audio){
+    // audio prefs persist even without an active campaign save
+    this.load();
+    this.data.audio = audio;
+    try{ localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); }catch(e){}
+  }
+};
+
+/* =========================================================================
+   PERMANENT UNLOCKS — completely separate localStorage key from the campaign
+   save. Never touched by SaveManager.reset() ("Borrar partida"), never mixed
+   with credits/upgrades/planet progress.
+   ========================================================================= */
+const UNLOCK_KEY = 'voidbound_lasthorizon_unlocks_v1';
+const UnlockManager = {
+  data: null,
+  load(){
+    try{
+      const raw = localStorage.getItem(UNLOCK_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      this.data = { unlockedShips: (parsed && Array.isArray(parsed.unlockedShips)) ? parsed.unlockedShips : [] };
+    }catch(e){
+      this.data = { unlockedShips: [] };
+    }
+    return this.data;
+  },
+  save(){
+    if(!this.data) return;
+    try{ localStorage.setItem(UNLOCK_KEY, JSON.stringify(this.data)); }catch(e){}
+  },
+  isUnlocked(shipId){
+    this.load();
+    return this.data.unlockedShips.indexOf(shipId) !== -1;
+  },
+  // derived from the existing unlock list — no extra storage: all five normal ships completed
+  secretAvailable(){
+    this.load();
+    return SHIPS.filter(s=>!s.secret).every(s=>this.data.unlockedShips.indexOf(s.id) !== -1);
+  },
+  unlock(shipId){
+    this.load();
+    if(this.data.unlockedShips.indexOf(shipId) === -1){
+      this.data.unlockedShips.push(shipId);
+      this.save();
+    }
+  },
+};
+
+/* =========================================================================
+   AUDIO — fully procedural via Web Audio API (oscillators, noise, filters,
+   a synthesized convolution reverb and a lookahead step-sequencer for
+   music). No external audio files, no franchise assets.
+
+   Structure:
+   - SFX are one-shot synthesized sounds (click, shoot, explosion, etc.)
+   - Music is generated by a small internal step-sequencer ("track engine")
+     that schedules notes slightly ahead of time using the AudioContext
+     clock (avoids setTimeout drift/clicks). Only ONE track is ever
+     actively scheduling notes at a time; switching tracks stops the old
+     scheduler immediately and crossfades the audible tail out while the
+     new track fades in — so nothing plays twice at once.
+   ========================================================================= */
+
+function midi2freq(m){ return 440 * Math.pow(2, (m-69)/12); }
+
+class AudioManager{
+  constructor(){
+    this.ctx = null;
+    this.masterGain = null;
+    this.musicGain = null;   // overall music bus (slider + mute applied here)
+    this.sfxGain = null;     // overall sfx bus (slider + mute applied here)
+    this.reverbNode = null;  // shared convolution reverb send (music only)
+    this.reverbReturn = null;
+    this.prefs = { master:80, music:60, sfx:85, muteMusic:false, muteSfx:false };
+    this.unlocked = false;
+    this.musicRestLevel = 0.6;
+
+    // track engine state
+    this._trackBus = null;
+    this._currentTrackName = null;
+    this._trackActive = false;
+    this._schedTimer = null;
+    this._nextNoteTime = 0;
+    this._step = 0;
+    this._stepDur = 0.2;
+    this._intensity = 0;        // smoothed 0..1 — travel "danger" layer mix
+    this._intensityTarget = 0;
+    this._bossPhase = 1;        // 1..3 — read live by the boss step function
+    this._loopCount = 0;
+    this._pendingStingerReturn = null;
+    this._distCurveCache = new Map();
+  }
+
+  /* ---------------- setup / unlock ---------------- */
+  init(prefs){
+    if(this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return; // browser without Web Audio support: fail silently, no console errors
+    try{
+      this.ctx = new AC();
+      this.masterGain = this.ctx.createGain();
+      this.musicGain = this.ctx.createGain();
+      this.sfxGain = this.ctx.createGain();
+      this.reverbNode = this.ctx.createConvolver();
+      this.reverbNode.buffer = this._makeImpulse(2.4, 2.6);
+      this.reverbReturn = this.ctx.createGain();
+      this.reverbReturn.gain.value = 0.5;
+      this.reverbNode.connect(this.reverbReturn);
+      this.reverbReturn.connect(this.musicGain);
+      this.musicGain.connect(this.masterGain);
+      this.sfxGain.connect(this.masterGain);
+      this.masterGain.connect(this.ctx.destination);
+      if(prefs) this.prefs = Object.assign(this.prefs, prefs);
+      this.applyVolumes();
+    }catch(e){
+      console.warn('Web Audio no disponible; el juego continuará sin audio.', e);
+      this.ctx = null;
+    }
+  }
+
+  unlock(){
+    // Must be called from a real user gesture (click/tap) per browser autoplay policy.
+    try{
+      if(!this.ctx) this.init(this.prefs);
+      if(this.ctx && this.ctx.state === 'suspended'){
+        this.ctx.resume().catch(()=>{ /* swallow: browser may re-block briefly, retried on next gesture */ });
+      }
+      this.unlocked = true;
+    }catch(e){ /* never throw from an input handler */ }
+  }
+
+  applyVolumes(){
+    if(!this.ctx) return;
+    const safePct = (v, fallback)=> Number.isFinite(v) ? clamp(v,0,100) : fallback;
+    const m  = safePct(this.prefs.master, 80) / 100;
+    const mu = this.prefs.muteMusic ? 0 : safePct(this.prefs.music, 60) / 100;
+    const sf = this.prefs.muteSfx ? 0 : safePct(this.prefs.sfx, 85) / 100;
+    this.musicRestLevel = Number.isFinite(mu) ? mu : 0.6;
+    const now = this._now();
+    if(!Number.isFinite(now)) return;
+    this.masterGain.gain.setTargetAtTime(m, now, 0.02);
+    this.musicGain.gain.setTargetAtTime(mu, now, 0.05);
+    this.sfxGain.gain.setTargetAtTime(sf, now, 0.02);
+  }
+
+  setPrefs(p){ this.prefs = Object.assign(this.prefs, p); this.applyVolumes(); }
+
+  _now(){ return this.ctx ? this.ctx.currentTime : 0; }
+
+  /* ---------------- shared synthesis helpers ---------------- */
+  _makeImpulse(duration, decay){
+    const ctx = this.ctx, rate = ctx.sampleRate, length = Math.floor(rate*duration);
+    const impulse = ctx.createBuffer(2, length, rate);
+    for(let ch=0; ch<2; ch++){
+      const data = impulse.getChannelData(ch);
+      for(let i=0;i<length;i++) data[i] = (Math.random()*2-1) * Math.pow(1 - i/length, decay);
+    }
+    return impulse;
+  }
+
+  _distCurve(amount){
+    const key = Math.round(amount*20);
+    if(this._distCurveCache.has(key)) return this._distCurveCache.get(key);
+    const k = key*5, n = 4096, curve = new Float32Array(n);
+    for(let i=0;i<n;i++){ const x = i*2/n - 1; curve[i] = (1+k)*x/(1+k*Math.abs(x)); }
+    this._distCurveCache.set(key, curve);
+    return curve;
+  }
+
+  _tone(freq, dur, type, gainVal, dest, sweepTo, delay){
+    if(!this.ctx) return;
+    const t0 = this._now() + (delay||0);
+    if(!Number.isFinite(freq) || !Number.isFinite(dur) || !Number.isFinite(t0) || !Number.isFinite(gainVal)) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    if(sweepTo && Number.isFinite(sweepTo)) osc.frequency.exponentialRampToValueAtTime(Math.max(sweepTo,1), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(gainVal,0.001), t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(dest || this.sfxGain);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  }
+
+  _noise(dur, gainVal, dest, filterFreq, delay){
+    if(!this.ctx) return;
+    const t0 = this._now() + (delay||0);
+    if(!Number.isFinite(dur) || dur<=0 || !Number.isFinite(gainVal) || !Number.isFinite(t0)) return;
+    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+    if(bufferSize<=0) return;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gainVal, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = Number.isFinite(filterFreq) ? filterFreq : 4000;
+    src.connect(filter); filter.connect(g); g.connect(dest || this.sfxGain);
+    src.start(t0); src.stop(t0 + dur + 0.02);
+  }
+
+  // richer melodic voice used by the music engine: optional filter, distortion and reverb send
+  _voice(bus, freq, t, dur, opts){
+    if(!this.ctx) return;
+    opts = opts || {};
+    if(!Number.isFinite(freq) || !Number.isFinite(t) || !Number.isFinite(dur) || dur<=0) return; // guards the exact class of bug that caused the crash (e.g. a note lookup returning undefined -> NaN)
+    const type = opts.type || 'sine';
+    const gainValRaw = opts.gain != null ? opts.gain : 0.18;
+    const gainVal = Number.isFinite(gainValRaw) ? gainValRaw : 0.18;
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if(opts.glideTo != null && Number.isFinite(opts.glideTo)) osc.frequency.exponentialRampToValueAtTime(Math.max(opts.glideTo,1), t+dur);
+    let node = osc;
+    if(opts.detuneVoice != null && Number.isFinite(opts.detuneVoice)){
+      const osc2 = ctx.createOscillator();
+      osc2.type = type; osc2.frequency.setValueAtTime(freq, t); osc2.detune.value = opts.detuneVoice;
+      const mix = ctx.createGain(); mix.gain.value = 1;
+      osc.connect(mix); osc2.connect(mix);
+      osc2.start(t); osc2.stop(t+dur+0.05);
+      node = mix;
+    }
+    if(opts.distortion && Number.isFinite(opts.distortion)){
+      const ws = ctx.createWaveShaper();
+      ws.curve = this._distCurve(opts.distortion);
+      ws.oversample = '2x';
+      node.connect(ws); node = ws;
+    }
+    if(opts.filterFreq != null && Number.isFinite(opts.filterFreq)){
+      const filt = ctx.createBiquadFilter();
+      filt.type = opts.filterType || 'lowpass';
+      filt.frequency.setValueAtTime(opts.filterFreq, t);
+      if(opts.filterSweepTo != null && Number.isFinite(opts.filterSweepTo)) filt.frequency.exponentialRampToValueAtTime(Math.max(opts.filterSweepTo,50), t+dur);
+      filt.Q.value = (opts.filterQ != null && Number.isFinite(opts.filterQ)) ? opts.filterQ : 0.8;
+      node.connect(filt); node = filt;
+    }
+    const g = ctx.createGain();
+    const attackRaw = opts.attack != null ? opts.attack : 0.015;
+    const attack = Number.isFinite(attackRaw) && attackRaw>0 ? attackRaw : 0.015;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(gainVal,0.001), t+attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    node.connect(g);
+    g.connect(bus);
+    if(opts.reverbSend && Number.isFinite(opts.reverbSend) && this.reverbNode){
+      const send = ctx.createGain(); send.gain.value = opts.reverbSend;
+      g.connect(send); send.connect(this.reverbNode);
+    }
+    osc.start(t); osc.stop(t+dur+0.08);
+  }
+
+  // one short delayed repeat of a voice hit, to simulate a delay/echo effect without feedback loops
+  _echoVoice(bus, freq, t, dur, opts, echoGainMult, echoDelaySec){
+    this._voice(bus, freq, t, dur, opts);
+    const eo = Object.assign({}, opts, { gain:(opts.gain||0.18)*(echoGainMult!=null?echoGainMult:0.4), reverbSend:(opts.reverbSend||0)*1.3 });
+    this._voice(bus, freq, t+(echoDelaySec||0.16), dur*0.9, eo);
+  }
+
+  _kick(bus, t, gain){
+    if(!this.ctx || !Number.isFinite(t)) return;
+    const g0 = Number.isFinite(gain) ? gain : 0.55;
+    const ctx=this.ctx;
+    const osc=ctx.createOscillator(); osc.type='sine';
+    osc.frequency.setValueAtTime(150,t);
+    osc.frequency.exponentialRampToValueAtTime(44,t+0.11);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(g0,t);
+    g.gain.exponentialRampToValueAtTime(0.0008,t+0.22);
+    osc.connect(g); g.connect(bus);
+    osc.start(t); osc.stop(t+0.24);
+  }
+  _hat(bus, t, gain, open){
+    if(!this.ctx || !Number.isFinite(t)) return;
+    const g0 = Number.isFinite(gain) ? gain : 0.1;
+    const ctx=this.ctx, dur = open?0.15:0.045;
+    const size = Math.floor(ctx.sampleRate*dur);
+    const buffer = ctx.createBuffer(1,size,ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<size;i++) data[i]=(Math.random()*2-1)*(1-i/size);
+    const src = ctx.createBufferSource(); src.buffer=buffer;
+    const filt = ctx.createBiquadFilter(); filt.type='highpass'; filt.frequency.value=6800;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(g0, t);
+    g.gain.exponentialRampToValueAtTime(0.0006, t+dur);
+    src.connect(filt); filt.connect(g); g.connect(bus);
+    src.start(t); src.stop(t+dur+0.02);
+  }
+  _snare(bus, t, gain){
+    if(!this.ctx || !Number.isFinite(t)) return;
+    const ctx=this.ctx, dur=0.14;
+    const size = Math.floor(ctx.sampleRate*dur);
+    const buffer = ctx.createBuffer(1,size,ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<size;i++) data[i]=(Math.random()*2-1)*(1-i/size);
+    const src = ctx.createBufferSource(); src.buffer=buffer;
+    const filt = ctx.createBiquadFilter(); filt.type='bandpass'; filt.frequency.value=1700; filt.Q.value=0.9;
+    const g = ctx.createGain();
+    const gv = Number.isFinite(gain) ? gain : 0.26;
+    g.gain.setValueAtTime(gv, t); g.gain.exponentialRampToValueAtTime(0.0008, t+dur);
+    src.connect(filt); filt.connect(g); g.connect(bus);
+    src.start(t); src.stop(t+dur+0.02);
+    const osc = ctx.createOscillator(); osc.type='triangle'; osc.frequency.setValueAtTime(190,t);
+    const g2 = ctx.createGain(); g2.gain.setValueAtTime(gv*0.55,t); g2.gain.exponentialRampToValueAtTime(0.0008,t+0.08);
+    osc.connect(g2); g2.connect(bus); osc.start(t); osc.stop(t+0.1);
+  }
+
+  // brief musical "duck" so shots/explosions stay clearly audible above the music
+  _duck(amount, recoverDur){
+    if(!this.ctx || !this.musicGain) return;
+    const g = this.musicGain.gain;
+    const now = this._now();
+    if(!Number.isFinite(now)) return;
+    const restLevel = Number.isFinite(this.musicRestLevel) ? this.musicRestLevel : 0.6;
+    const amt = Number.isFinite(amount) ? amount : 0.4;
+    const recover = Number.isFinite(recoverDur) ? recoverDur : 0.5;
+    const floor = restLevel * (1-amt);
+    const currentVal = Number.isFinite(g.value) ? g.value : restLevel;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(Math.max(currentVal, 0.0001), now);
+    g.linearRampToValueAtTime(Math.max(floor,0.0001), now+0.035);
+    g.linearRampToValueAtTime(Math.max(restLevel,0.0001), now+0.035+recover);
+  }
+
+  /* ---------------- one-shot SFX ---------------- */
+  click(){ if(!this.ctx)return; this._tone(520, 0.06, 'square', 0.18); }
+  select(){ if(!this.ctx)return; this._tone(700, 0.09, 'triangle', 0.16, null, 900); }
+  shoot(){ if(!this.ctx)return; this._tone(880, 0.08, 'sawtooth', 0.09, null, 340); }
+  hit(){ if(!this.ctx)return; this._noise(0.08, 0.14, null, 2200); this._duck(0.22, 0.12); }
+  explosion(big){ if(!this.ctx)return;
+    this._noise(big?0.7:0.35, big?0.35:0.22, null, big?900:1600);
+    this._tone(big?90:150, big?0.6:0.3, 'sawtooth', 0.2, null, big?30:40);
+    this._duck(big?0.5:0.32, big?0.9:0.4);
+  }
+  purchase(){ if(!this.ctx)return; this._tone(600,0.08,'triangle',0.15,null,900); this._tone(900,0.1,'triangle',0.13,null,1400,0.07); }
+  upgrade(){ if(!this.ctx)return; this._tone(440,0.1,'sine',0.15,null,880); this._tone(660,0.14,'sine',0.14,null,1320,0.09); }
+  damage(){ if(!this.ctx)return; this._noise(0.15,0.2,null,900); this._tone(140,0.18,'sawtooth',0.16,null,60); this._duck(0.3,0.3); }
+  shieldHit(){ if(!this.ctx)return; this._tone(1200,0.1,'sine',0.14,null,700); }
+  bossAlert(){ if(!this.ctx)return;
+    for(let i=0;i<3;i++) this._tone(180,0.3,'square',0.15,null,140,i*0.35);
+  }
+
+  // GAME OVER — short synthesized defeat stinger (descending minor line + low thud), then
+  // the menu theme fades back in on its own, unless another track is started first.
+  gameover(){
+    if(!this.ctx) return;
+    this.stopMusic(0.4);
+    const bus = this.sfxGain; // one-shot: route straight to sfx bus, always audible, no ducking needed
+    const t0 = this._now() + 0.05;
+    const notes = [57, 55, 53, 50]; // A3 G3 F3 D3 — descending
+    notes.forEach((m,i)=>{
+      this._voice(bus, midi2freq(m), t0 + i*0.32, 0.55, { type:'sawtooth', gain:0.14, filterFreq:1200, filterSweepTo:300, distortion:0.15 });
+    });
+    this._kick(bus, t0 + notes.length*0.32 - 0.05, 0.35);
+    this._scheduleStingerReturn(2.6);
+  }
+
+  // VICTORY — short triumphant ascending fanfare with a shimmering echo tail, then the
+  // menu theme fades back in behind the victory screen.
+  victory(){
+    if(!this.ctx) return;
+    this.stopMusic(0.4);
+    const bus = this.sfxGain;
+    const t0 = this._now() + 0.05;
+    const notes = [57, 60, 64, 69, 72]; // A3 C4 E4 A4 C5 — rising major-borrowed arpeggio
+    notes.forEach((m,i)=>{
+      this._echoVoice(bus, midi2freq(m), t0 + i*0.16, 0.5, { type:'triangle', gain:0.16, reverbSend:0.25 }, 0.35, 0.22);
+    });
+    this._voice(bus, midi2freq(76), t0 + notes.length*0.16 + 0.05, 1.1, { type:'sine', gain:0.16, reverbSend:0.35, attack:0.02 });
+    this._voice(bus, midi2freq(69), t0 + notes.length*0.16 + 0.05, 1.1, { type:'sine', gain:0.12, reverbSend:0.35, attack:0.02 });
+    this._scheduleStingerReturn(3.2);
+  }
+
+  _scheduleStingerReturn(delaySec){
+    clearTimeout(this._pendingStingerReturn);
+    this._pendingStingerReturn = setTimeout(()=>{ this.startMusic('menu'); }, delaySec*1000);
+  }
+
+  /* ---------------- dynamic music controls (called by the game) ---------------- */
+  setIntensity(target){ this._intensityTarget = Number.isFinite(target) ? clamp(target, 0, 1) : 0; }
+  setBossPhase(phase){ this._bossPhase = Number.isFinite(phase) ? phase : 1; }
+
+  /* ---------------- track engine ---------------- */
+  startMusic(trackName){
+    if(!this.ctx) return;
+    if(this._currentTrackName === trackName && this._trackActive) return; // already playing — idempotent
+    clearTimeout(this._pendingStingerReturn);
+    this._stopTrackInternal(0.6);
+    this._beginTrack(trackName);
+  }
+
+  stopMusic(fadeSec){
+    clearTimeout(this._pendingStingerReturn);
+    this._stopTrackInternal(fadeSec!=null?fadeSec:0.5);
+  }
+
+  _stopTrackInternal(fadeSec){
+    if(this._schedTimer){ clearInterval(this._schedTimer); this._schedTimer = null; }
+    this._trackActive = false;
+    this._currentTrackName = null;
+    const fade = Number.isFinite(fadeSec) && fadeSec > 0 ? fadeSec : 0.5;
+    if(this._trackBus && this.ctx){
+      const bus = this._trackBus;
+      const g = bus.gain;
+      const now = this._now();
+      if(Number.isFinite(now)){
+        const currentVal = Number.isFinite(g.value) ? g.value : 0.0001;
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(Math.max(currentVal,0.0001), now);
+        g.linearRampToValueAtTime(0.0001, now+fade);
+      }
+      setTimeout(()=>{ try{ bus.disconnect(); }catch(e){} }, fade*1000 + 200);
+      this._trackBus = null;
+    }
+  }
+
+  _beginTrack(name){
+    if(!this.ctx) return;
+    const ctx = this.ctx;
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(0.0001, ctx.currentTime);
+    bus.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.9);
+    bus.connect(this.musicGain);
+
+    this._trackBus = bus;
+    this._currentTrackName = name;
+    this._trackActive = true;
+    this._step = 0;
+    this._loopCount = 0;
+    this._intensity = 0; this._intensityTarget = 0;
+    this._bossPhase = 1;
+
+    const tempo = { menu:72, travel:128, boss:150 }[name] || 100;
+    const stepsPerBeat = { menu:2, travel:4, boss:4 }[name] || 4;
+    const computedStepDur = 60 / tempo / stepsPerBeat;
+    // _stepDur drives every scheduling time in the sequencer — must always be finite and positive
+    this._stepDur = (Number.isFinite(computedStepDur) && computedStepDur > 0) ? computedStepDur : 0.2;
+    const startAt = ctx.currentTime + 0.06;
+    this._nextNoteTime = Number.isFinite(startAt) ? startAt : 0;
+
+    const stepFn = { menu:this._stepMenu, travel:this._stepTravel, boss:this._stepBoss }[name];
+    if(!stepFn) return;
+    this._activeStepFn = stepFn.bind(this);
+
+    const tick = ()=>{
+      if(!this._trackActive || !this.ctx) return;
+      const nowT = this.ctx.currentTime;
+      if(!Number.isFinite(nowT)) return;
+      if(!Number.isFinite(this._nextNoteTime)) this._nextNoteTime = nowT + 0.06; // self-heal, should never trigger
+      let guard = 0;
+      while(this._nextNoteTime < nowT + 0.22 && guard < 64){
+        this._activeStepFn(this._step, this._nextNoteTime, this._trackBus);
+        this._nextNoteTime += this._stepDur;
+        this._step++;
+        guard++;
+      }
+      this._intensity += (this._intensityTarget - this._intensity) * 0.12;
+      if(!Number.isFinite(this._intensity)) this._intensity = 0;
+    };
+    this._schedTimer = setInterval(tick, 90);
+    tick();
+  }
+
+  /* ----- MENU track: dark, mysterious, one recognizable 16-step motif over
+     a slowly alternating two-chord pad (A minor / F major), gentle echo on
+     the lead so it feels spacious without needing a real feedback delay. ----- */
+  _stepMenu(step, t, bus){
+    const LOOP = 32; // 16 beats @72bpm (~13s) before the phrase repeats
+    const local = step % LOOP;
+    if(local === 0) this._loopCount++;
+    const chordRoots = [57, 53]; // A3, F3
+    const chordIdx = local < 16 ? 0 : 1;
+    const root = chordRoots[chordIdx];
+
+    // sustained pad + bass, retriggered once at the start of each chord half
+    if(local === 0 || local === 16){
+      this._voice(bus, midi2freq(root-12), t, this._stepDur*16, { type:'sine', gain:0.1, attack:1.2, reverbSend:0.15 });
+      this._voice(bus, midi2freq(root), t, this._stepDur*16, { type:'sine', gain:0.07, attack:1.4, detuneVoice:7, reverbSend:0.35, filterFreq:900 });
+      this._voice(bus, midi2freq(root+7), t, this._stepDur*16, { type:'triangle', gain:0.045, attack:1.8, reverbSend:0.4, filterFreq:1100 });
+    }
+
+    // the recognizable motif (scale degrees relative to A minor), echoed for atmosphere
+    const motif = [ [0,3],[null,1],[3,2],[5,3],[7,2],[5,2],[3,3] ]; // sums to 16 steps
+    let acc = 0, note = null, noteLen = 0;
+    for(const [deg,len] of motif){
+      if(local - (chordIdx===0?0:16) >= acc && local - (chordIdx===0?0:16) < acc+len){ note=deg; noteLen=len; break; }
+      acc += len;
+    }
+    const isNoteStart = (local - (chordIdx===0?0:16)) === acc;
+    if(note !== null && isNoteStart){
+      // 8 degrees (root ... octave) so motif index 7 ("rise to the octave") is always in range
+      const scale = [0,2,3,5,7,8,10,12];
+      this._echoVoice(bus, midi2freq(57 + scale[note]), t, this._stepDur*noteLen*0.92, { type:'triangle', gain:0.1, filterFreq:2200, reverbSend:0.3 }, 0.3, 0.2);
+    }
+  }
+
+  /* ----- TRAVEL track: propulsive arcade groove, i–VI two-chord riff,
+     driving eighth bass + hats, with a dynamic "danger" layer (extra snare
+     + harmony) that fades in smoothly via setIntensity() when enemies
+     are on screen. ----- */
+  _stepTravel(step, t, bus){
+    const local = step % 16; // one bar = 16 steps (16th notes) @128bpm
+    const bar = Math.floor(step/16) % 4;
+    const rootMidi = (bar < 2) ? 45 : 43; // A2 for 2 bars, G2 for 2 bars (i - VII feel)
+
+    if(local === 0 || local === 8) this._kick(bus, t, 0.4);
+    if(local === 4 || local === 12) this._snare(bus, t, 0.22);
+    if(local % 2 === 0) this._hat(bus, t, local%8===6?0.16:0.08, local===14);
+
+    // driving bass pulse (root-fifth)
+    if(local % 4 === 0){
+      this._voice(bus, midi2freq(rootMidi + (local===0?0:7)), t, this._stepDur*3.6, { type:'sawtooth', gain:0.13, filterFreq:900, filterSweepTo:260, filterType:'lowpass' });
+    }
+
+    // arpeggiated lead riff, outlines the chord
+    const arp = [0,7,10,12,10,7,3,0];
+    if(local % 2 === 0){
+      const idx = (local/2) % arp.length;
+      this._voice(bus, midi2freq(rootMidi+12+arp[idx]), t, this._stepDur*1.7, { type:'square', gain:0.07, filterFreq:2600, filterType:'lowpass' });
+    }
+
+    // dynamic danger layer — only spends CPU/nodes when intensity is actually audible
+    if(this._intensity > 0.12){
+      const mix = this._intensity;
+      if(local === 6 || local === 14){
+        this._snare(bus, t, 0.16*mix);
+      }
+      if(local % 8 === 2){
+        this._voice(bus, midi2freq(rootMidi+19), t, this._stepDur*2, { type:'sawtooth', gain:0.06*mix, filterFreq:3200, distortion:0.1*mix });
+      }
+    }
+  }
+
+  /* ----- BOSS track: aggressive, dark, Phrygian-flavoured gallop. Reads
+     this._bossPhase every tick so intensity rises live as the fight
+     escalates, without restarting or overlapping the loop. ----- */
+  _stepBoss(step, t, bus){
+    const local = step % 16;
+    const phase = this._bossPhase || 1;
+    const rootMidi = 40; // E2, Phrygian home for a menacing sound
+
+    // four-on-the-floor gallop, doubles up from phase 2
+    if(local % 4 === 0) this._kick(bus, t, 0.5);
+    if(phase >= 2 && local % 4 === 2) this._kick(bus, t, 0.32);
+    if(local === 4 || local === 12) this._snare(bus, t, 0.3);
+    if(phase >= 3 && (local === 6 || local === 14)) this._snare(bus, t, 0.18);
+    this._hat(bus, t, 0.09, false);
+
+    // distorted stabbing bass, gallop rhythm, distortion grows with phase
+    if(local % 4 === 0 || local % 4 === 3){
+      this._voice(bus, midi2freq(rootMidi), t, this._stepDur*1.4, {
+        type:'sawtooth', gain:0.16, filterFreq:1100+phase*300, filterType:'lowpass',
+        distortion: 0.12 + phase*0.12,
+      });
+    }
+
+    // dissonant stabbing lead — minor 2nd / tritone accents for menace
+    const stabDegrees = [0,1,6,12];
+    if(local % 4 === 2){
+      const deg = stabDegrees[(step/4|0) % stabDegrees.length];
+      this._voice(bus, midi2freq(rootMidi+12+deg), t, this._stepDur*1.1, { type:'square', gain:0.09+phase*0.02, filterFreq:2000+phase*400 });
+    }
+
+    // phase 3: low rumbling drone underlines "most dangerous moment"
+    if(phase >= 3 && local === 0){
+      this._voice(bus, midi2freq(rootMidi-12), t, this._stepDur*16, { type:'sine', gain:0.09, attack:0.4, distortion:0.15 });
+    }
+  }
+}
+
+
+/* =========================================================================
+   small utilities
+   ========================================================================= */
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+function rand(min,max){ return min + Math.random()*(max-min); }
+function randInt(min,max){ return Math.floor(rand(min,max+1)); }
+function dist2(ax,ay,bx,by){ const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy; }
+function circleHit(ax,ay,ar,bx,by,br){ const r=ar+br; return dist2(ax,ay,bx,by) <= r*r; }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function fmtTime(ms){
+  const s = Math.floor(ms/1000);
+  const m = Math.floor(s/60);
+  const ss = s%60;
+  return `${m}:${ss.toString().padStart(2,'0')}`;
+}
+/* =========================================================================
+   ENTITIES
+   ========================================================================= */
+
+/* ---------------- pixel-art sprite builder (visual only) -----------------
+   Builds a tiny offscreen canvas from a text grid, one canvas-pixel per
+   character, then the main renderer scales it up with image smoothing
+   disabled for a crisp, authentic pixel-art look. Sprites are cached so
+   each ship/enemy/boss grid is only rasterized once. */
+const PixelSprites = {
+  _cache: new Map(),
+
+  _mirrorH(halfRows){
+    return halfRows.map(r => r.split('').reverse().join('') + r);
+  },
+  _mirrorV(topRows){
+    return topRows.concat(topRows.slice().reverse());
+  },
+
+  _rasterize(rows, palette){
+    const h = rows.length, w = rows[0].length;
+    const cnv = document.createElement('canvas');
+    cnv.width = w; cnv.height = h;
+    const c = cnv.getContext('2d');
+    for(let y=0; y<h; y++){
+      const row = rows[y];
+      for(let x=0; x<w; x++){
+        const ch = row[x];
+        if(ch === '.' || ch === ' ' || !palette[ch]) continue;
+        c.fillStyle = palette[ch];
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+    return cnv;
+  },
+
+  // horizontally-mirrored sprite (ships, enemies)
+  getHMirrored(key, halfRows, palette){
+    if(this._cache.has(key)) return this._cache.get(key);
+    const cnv = this._rasterize(this._mirrorH(halfRows), palette);
+    this._cache.set(key, cnv);
+    return cnv;
+  },
+  // same silhouette, tinted solid white — used for the brief "took damage" flash
+  getHMirroredWhite(key, halfRows, palette){
+    const whiteKey = key+':white';
+    if(this._cache.has(whiteKey)) return this._cache.get(whiteKey);
+    const whitePalette = {};
+    Object.keys(palette).forEach(k=> whitePalette[k] = '#ffffff');
+    const cnv = this._rasterize(this._mirrorH(halfRows), whitePalette);
+    this._cache.set(whiteKey, cnv);
+    return cnv;
+  },
+  // same silhouette, tinted solid black — used to shade the depth layers of the Hangar's pseudo-3D view
+  getHMirroredDark(key, halfRows, palette){
+    const darkKey = key+':dark';
+    if(this._cache.has(darkKey)) return this._cache.get(darkKey);
+    const darkPalette = {};
+    Object.keys(palette).forEach(k=> darkPalette[k] = '#000000');
+    const cnv = this._rasterize(this._mirrorH(halfRows), darkPalette);
+    this._cache.set(darkKey, cnv);
+    return cnv;
+  },
+  // vertically-mirrored sprite (boss hull)
+  getVMirrored(key, topRows, palette){
+    if(this._cache.has(key)) return this._cache.get(key);
+    const cnv = this._rasterize(this._mirrorV(topRows), palette);
+    this._cache.set(key, cnv);
+    return cnv;
+  },
+  getVMirroredWhite(key, topRows, palette){
+    const whiteKey = key+':white';
+    if(this._cache.has(whiteKey)) return this._cache.get(whiteKey);
+    const whitePalette = {};
+    Object.keys(palette).forEach(k=> whitePalette[k] = '#ffffff');
+    const cnv = this._rasterize(this._mirrorV(topRows), whitePalette);
+    this._cache.set(whiteKey, cnv);
+    return cnv;
+  },
+
+  // draws a cached sprite canvas centered at (0,0) in the current transform,
+  // scaled up with no smoothing so pixels stay crisp
+  draw(ctx, canvas, destW, destH){
+    const prevSmooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(canvas, -destW/2, -destH/2, destW, destH);
+    ctx.imageSmoothingEnabled = prevSmooth;
+  },
+};
+
+function shipPalette(ship){
+  // material tint per hull family + the ship's own UI color as the accent/highlight,
+  // so pixel art ties back into the same color identity used in the hangar screen
+  const HULL_TINTS = {
+    vanguard: { H:'#4a5c70', S:'#262f3a' },
+    phantom:  { H:'#5c4d70', S:'#2c2438' },
+    titan:    { H:'#5c5448', S:'#2e2a22' },
+    razor:    { H:'#6e3a3a', S:'#361c1c' },
+    oracle:   { H:'#2f5c54', S:'#183028' },
+    eclipse:  { H:'#3a2f66', S:'#1b1535' },
+  };
+  const tint = HULL_TINTS[ship.id] || HULL_TINTS.vanguard;
+  return {
+    H: tint.H, S: tint.S,
+    L: ship.accent || '#ffffff',
+    A: ship.color,
+    C: '#0c1626',
+    W: '#12141a',
+    D: '#0a1f1a',
+    R: '#eafff5',
+    E: '#ff8a3a',
+    P: tint.S,
+  };
+}
+
+/* ---------------- Hangar pixel-art rendering (reuses PixelSprites/SHIP_SPRITE_GRIDS) ---- */
+
+// Small static icon for the ship-list cards — one draw call, no animation.
+function drawShipIcon(canvas, shipId){
+  const ship = SHIPS.find(s=>s.id===shipId);
+  if(!ship || !canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  const grid = SHIP_SPRITE_GRIDS[ship.id];
+  const sprite = PixelSprites.getHMirrored('ship:'+ship.id, grid, shipPalette(ship));
+  // "contain" fit inside the card's small canvas — ship grids are taller than they are
+  // wide, so sizing purely off the canvas width clipped the nose/engine off-canvas.
+  const maxW = w*0.82, maxH = h*0.82;
+  let destW = maxW, destH = sprite.height/sprite.width*destW;
+  if(destH > maxH){ destH = maxH; destW = sprite.width/sprite.height*destH; }
+  ctx.save();
+  ctx.translate(w/2, h/2);
+  PixelSprites.draw(ctx, sprite, destW, destH);
+  ctx.restore();
+}
+
+// Large interactive preview: ship "parked" in a simple hangar bay, with a cheap 2D
+// turntable rotation (horizontal squash) driven by drag or a slow idle auto-spin.
+const HangarViewer = {
+  canvas:null, ctx:null, shipId:null, angle:0.35, dragging:false, lastX:0, raf:null,
+  start(canvas, shipId){
+    this.stop();
+    this.canvas = canvas; this.ctx = canvas.getContext('2d');
+    this.shipId = shipId; this.angle = 0.35;
+    this._onDown = (e)=>{ this.dragging=true; this.lastX = (e.touches?e.touches[0].clientX:e.clientX); };
+    this._onMove = (e)=>{
+      if(!this.dragging) return;
+      const x = (e.touches?e.touches[0].clientX:e.clientX);
+      this.angle += (x-this.lastX)*0.016; this.lastX = x;
+    };
+    this._onUp = ()=>{ this.dragging=false; };
+    canvas.addEventListener('mousedown', this._onDown);
+    canvas.addEventListener('touchstart', this._onDown, {passive:true});
+    window.addEventListener('mousemove', this._onMove);
+    window.addEventListener('touchmove', this._onMove, {passive:true});
+    window.addEventListener('mouseup', this._onUp);
+    window.addEventListener('touchend', this._onUp);
+    const loop = ()=>{
+      if(!this.canvas) return;
+      if(!this.dragging) this.angle += 0.0055;
+      this._render();
+      this.raf = requestAnimationFrame(loop);
+    };
+    loop();
+  },
+  stop(){
+    if(this.raf) cancelAnimationFrame(this.raf);
+    this.raf = null;
+    if(this.canvas){
+      this.canvas.removeEventListener('mousedown', this._onDown);
+      this.canvas.removeEventListener('touchstart', this._onDown);
+    }
+    window.removeEventListener('mousemove', this._onMove);
+    window.removeEventListener('touchmove', this._onMove);
+    window.removeEventListener('mouseup', this._onUp);
+    window.removeEventListener('touchend', this._onUp);
+    this.canvas = null; this.ctx = null; this.shipId = null;
+  },
+  /* ---------- HD-2D look: crisp pixel-art sprite standing in a lit, depth-blurred diorama ----------
+     The hangar backdrop is drawn procedurally at low resolution (pixel art), upscaled without
+     smoothing, then given HD-2D treatment: bloom on lights, tilt-shift blur on top/bottom bands,
+     colour grading and vignette. It is built once per canvas size and cached. */
+  _bgCache:{},
+  _buildBackground(w,h){
+    const key = w+'x'+h;
+    if(this._bgCache[key]) return this._bgCache[key];
+    const LW=160, LH=100;
+    let seed=1337; const rnd=()=> (seed=(seed*1664525+1013904223)>>>0)/4294967296;
+    const low=document.createElement('canvas'); low.width=LW; low.height=LH;
+    const g=low.getContext('2d');
+    const R=(x,y,ww,hh,c)=>{ g.fillStyle=c; g.fillRect(x,y,ww,hh); };
+
+    // base wall + ceiling
+    R(0,0,LW,LH,'#0e1626');
+    R(0,0,LW,14,'#070b15');
+    // back wall panels
+    for(let py=14; py<62; py+=12){
+      for(let px=0; px<LW; px+=16){
+        R(px,py,16,12,'#111b2f');
+        R(px,py,16,1,'#1a2a47'); R(px,py,1,12,'#1a2a47');
+        R(px,py+11,16,1,'#090f1c'); R(px+15,py,1,12,'#090f1c');
+        if(rnd()<0.12) R(px+3+Math.floor(rnd()*8),py+3+Math.floor(rnd()*5),2,1, rnd()<0.5?'#4fd8e8':'#ff9f4a');
+      }
+    }
+    // big viewport onto space
+    R(42,17,76,38,'#2a3b5c');
+    R(44,19,72,34,'#02040a');
+    const neb=g.createRadialGradient(62,34,2,62,34,34);
+    neb.addColorStop(0,'rgba(120,70,190,0.55)'); neb.addColorStop(1,'rgba(120,70,190,0)');
+    g.fillStyle=neb; g.fillRect(44,19,72,34);
+    const neb2=g.createRadialGradient(108,26,1,108,26,22);
+    neb2.addColorStop(0,'rgba(40,150,190,0.40)'); neb2.addColorStop(1,'rgba(40,150,190,0)');
+    g.fillStyle=neb2; g.fillRect(44,19,72,34);
+    for(let i=0;i<70;i++){
+      const sx=45+Math.floor(rnd()*70), sy=20+Math.floor(rnd()*32), b=rnd();
+      R(sx,sy,1,1, b>0.85?'#ffffff': b>0.5?'#9fb8e8':'#4a5c86');
+    }
+    // planet (pixel-shaded sphere, light from upper-left)
+    const pcx=96, pcy=38, pr=11;
+    for(let dy=-pr; dy<=pr; dy++){
+      for(let dx=-pr; dx<=pr; dx++){
+        const d=Math.sqrt(dx*dx+dy*dy); if(d>pr) continue;
+        const lit=(-dx*0.6-dy*0.5)/pr; // -1..1
+        const band=Math.sin(dy*0.9+dx*0.15)*0.12;
+        const v=lit+band;
+        const c = v>0.45?'#7fe0c8': v>0.1?'#3fb4a4': v>-0.35?'#217f86':'#10404f';
+        R(pcx+dx,pcy+dy,1,1,c);
+      }
+    }
+    R(pcx-14,pcy+2,28,1,'rgba(200,230,255,0.35)'); // thin ring
+    // window frame + mullion
+    R(42,17,76,2,'#3a4f78'); R(42,53,76,2,'#1b2740');
+    R(79,19,2,34,'#2a3b5c');
+    // girder + trusses
+    R(0,14,LW,3,'#18263f'); R(0,17,LW,1,'#0a1020');
+    for(let x=4;x<LW;x+=12) R(x,15,1,1,'#3a4f78');
+    for(let x=0;x<LW;x+=20){ R(x,3,1,11,'#121c30'); R(x+1,3,1,11,'#0b1322'); }
+    // ceiling light strips (bloom sources)
+    const lights=[];
+    [[24,9,26],[110,9,26]].forEach(([lx,ly,lw])=>{ R(lx,ly,lw,2,'#d8f2ff'); R(lx,ly+2,lw,1,'#6aa6c8'); lights.push([lx+lw/2,ly+1,lw]); });
+    // central spot lamp above the pad
+    R(74,10,12,3,'#2a3b5c'); R(76,13,8,2,'#fff4d0'); lights.push([80,14,12]);
+    // side pillars with warning lights
+    R(0,17,10,83,'#0a111f'); R(10,17,1,83,'#1c2c4a'); R(0,17,1,83,'#05080f');
+    R(150,17,10,83,'#0a111f'); R(149,17,1,83,'#1c2c4a'); R(159,17,1,83,'#05080f');
+    for(let y=28;y<90;y+=14){ R(3,y,4,2,'#16233a'); R(153,y,4,2,'#16233a'); }
+    R(4,24,2,2,'#ff5a3c'); R(154,24,2,2,'#ff5a3c'); lights.push([5,25,6],[155,25,6]);
+    // floor
+    const vx=80, vy=58;
+    const fl=g.createLinearGradient(0,62,0,LH); fl.addColorStop(0,'#0b1220'); fl.addColorStop(1,'#16223a');
+    g.fillStyle=fl; g.fillRect(10,62,140,LH-62);
+    R(10,62,140,1,'#223555');
+    for(let k=1;k<9;k++){ const yy=Math.round(62+Math.pow(k/8.5,1.7)*(LH-62)); R(10,yy,140,1,'#1a2a47'); }
+    for(let bx=-60; bx<=220; bx+=22){
+      for(let y=63;y<LH;y++){ const x=Math.round(vx+(bx-vx)*(y-vy)/(LH-vy)); if(x>=10&&x<150) R(x,y,1,1,'#19284a'); }
+    }
+    // props: crates (left), fuel tanks (right), console (left wall)
+    R(14,78,15,11,'#26344d'); R(14,78,15,2,'#3a4c6b'); R(14,84,15,1,'#17233a'); R(20,78,2,11,'#17233a');
+    R(18,70,11,8,'#2d3c58'); R(18,70,11,2,'#41557a'); R(22,70,2,8,'#1a263e');
+    R(128,70,10,20,'#31445f'); R(128,70,10,2,'#4a6385'); R(128,76,10,1,'#1a2740'); R(128,83,10,1,'#1a2740');
+    R(140,74,8,16,'#2b3c56'); R(140,74,8,2,'#43597c'); R(140,80,8,1,'#1a2740');
+    R(30,40,8,14,'#0a111f'); R(31,42,6,6,'#134a5e'); R(32,43,4,1,'#4fd8e8'); R(32,45,3,1,'#2ba5c0'); lights.push([34,45,8]);
+    // crane arm
+    for(let i=0;i<40;i++){ R(10+i,17+Math.floor(i*0.28),1,2,'#202e48'); }
+    R(49,28,1,9,'#3a4f78'); R(48,37,3,2,'#56709a');
+    // landing pad: hazard rim + plate
+    const padCx=80, padCy=84, prx=31, pry=7;
+    for(let a=0;a<360;a+=2){
+      const rad=a*Math.PI/180, x=Math.round(padCx+Math.cos(rad)*prx), y=Math.round(padCy+Math.sin(rad)*pry);
+      R(x,y,2,1, Math.floor(a/12)%2?'#e8c030':'#15151a');
+    }
+    for(let dy=-pry+1; dy<pry; dy++){
+      const ww=Math.floor(prx*Math.sqrt(1-(dy*dy)/(pry*pry)))-1;
+      R(padCx-ww,padCy+dy,ww*2,1, dy<0?'#1d2c48':'#16223a');
+    }
+
+    // upscale crisp
+    const base=document.createElement('canvas'); base.width=w; base.height=h;
+    const b=base.getContext('2d'); b.imageSmoothingEnabled=false; b.drawImage(low,0,0,w,h);
+
+    // bloom on light sources
+    const sx=w/LW, sy=h/LH;
+    b.globalCompositeOperation='lighter';
+    lights.forEach(([lx,ly,lw])=>{
+      const rr=Math.max(14,lw*sx*1.1);
+      const bl=b.createRadialGradient(lx*sx,ly*sy,1,lx*sx,ly*sy,rr);
+      bl.addColorStop(0,'rgba(190,225,255,0.38)'); bl.addColorStop(1,'rgba(190,225,255,0)');
+      b.fillStyle=bl; b.fillRect(lx*sx-rr,ly*sy-rr,rr*2,rr*2);
+    });
+    b.globalCompositeOperation='source-over';
+
+    // colour grading
+    const cg=b.createLinearGradient(0,0,0,h);
+    cg.addColorStop(0,'rgba(50,120,190,0.14)'); cg.addColorStop(1,'rgba(255,150,70,0.07)');
+    b.fillStyle=cg; b.fillRect(0,0,w,h);
+
+    // tilt-shift: blurred copy (downscale + smooth upscale) shown only on top/bottom bands
+    const sm=document.createElement('canvas'); sm.width=Math.max(8,Math.round(w/6)); sm.height=Math.max(8,Math.round(h/6));
+    const smc=sm.getContext('2d'); smc.imageSmoothingEnabled=true; smc.drawImage(base,0,0,sm.width,sm.height);
+    const blur=document.createElement('canvas'); blur.width=w; blur.height=h;
+    const bc=blur.getContext('2d'); bc.imageSmoothingEnabled=true; bc.drawImage(sm,0,0,w,h);
+    bc.globalCompositeOperation='destination-in';
+    const mk=bc.createLinearGradient(0,0,0,h);
+    mk.addColorStop(0,'rgba(0,0,0,1)'); mk.addColorStop(0.36,'rgba(0,0,0,0)');
+    mk.addColorStop(0.84,'rgba(0,0,0,0)'); mk.addColorStop(1,'rgba(0,0,0,1)');
+    bc.fillStyle=mk; bc.fillRect(0,0,w,h);
+    b.drawImage(blur,0,0);
+
+    // vignette
+    const vg=b.createRadialGradient(w/2,h*0.55,h*0.30,w/2,h*0.55,w*0.72);
+    vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.62)');
+    b.fillStyle=vg; b.fillRect(0,0,w,h);
+
+    this._bgCache[key]=base;
+    return base;
+  },
+  _render(){
+    const ctx=this.ctx, canvas=this.canvas, w=canvas.width, h=canvas.height;
+    const ship = SHIPS.find(s=>s.id===this.shipId);
+    if(!ship) return;
+    const t = performance.now()/1000;
+    ctx.clearRect(0,0,w,h);
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(this._buildBackground(w,h),0,0);
+
+    const cx=w/2, padY=h*0.84;           // landing pad centre
+    const grid = SHIP_SPRITE_GRIDS[ship.id];
+    const pal = shipPalette(ship);
+    const sprite = PixelSprites.getHMirrored('ship:'+ship.id, grid, pal);
+    const dark = PixelSprites.getHMirroredDark('ship:'+ship.id, grid, pal);
+    const SC = 4;                         // integer pixel scale -> crisp pixel art, ~80px tall (half the old viewer)
+    const destW = sprite.width*SC, destH = sprite.height*SC;
+    const bob = Math.sin(t*1.8)*2;
+    const shipBottom = padY-12+bob, shipCY = shipBottom-destH/2;
+    const ca = Math.cos(this.angle);
+    const sgn = ca<0?-1:1, sx = sgn*Math.max(Math.abs(ca),0.08);
+
+    // volumetric spot light from the ceiling lamp
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const flick = 0.85+0.15*Math.sin(t*3.1)+0.04*Math.sin(t*11);
+    const cone=ctx.createLinearGradient(0,h*0.15,0,padY);
+    cone.addColorStop(0,'rgba(190,230,255,'+(0.22*flick)+')'); cone.addColorStop(1,'rgba(190,230,255,'+(0.04*flick)+')');
+    ctx.fillStyle=cone;
+    ctx.beginPath(); ctx.moveTo(cx-9,h*0.15); ctx.lineTo(cx+9,h*0.15); ctx.lineTo(cx+w*0.2,padY); ctx.lineTo(cx-w*0.2,padY); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    // glowing ring on the pad (ship colour) + soft contact shadow
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const pulse=0.55+0.25*Math.sin(t*2.2);
+    ctx.strokeStyle=ship.color; ctx.globalAlpha=pulse*0.8; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(cx,padY,w*0.155,h*0.04,0,0,Math.PI*2); ctx.stroke();
+    const rg=ctx.createRadialGradient(cx,padY,2,cx,padY,w*0.2);
+    rg.addColorStop(0,ship.color); rg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.globalAlpha=0.16*pulse; ctx.fillStyle=rg;
+    ctx.beginPath(); ctx.ellipse(cx,padY,w*0.2,h*0.06,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    const sh=ctx.createRadialGradient(cx,padY-2,2,cx,padY-2,w*0.12);
+    sh.addColorStop(0,'rgba(0,0,0,0.55)'); sh.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=sh; ctx.translate(0,0);
+    ctx.beginPath(); ctx.ellipse(cx,padY-2,w*0.12*(0.7+0.3*Math.abs(ca)),h*0.032,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    // faint glossy floor reflection
+    ctx.save();
+    ctx.globalAlpha=0.12; ctx.translate(cx, shipBottom+10+destH*0.18); ctx.scale(sx,-0.36);
+    PixelSprites.draw(ctx, sprite, destW, destH);
+    ctx.restore();
+
+    // halo (bloom) behind the ship
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const halo=ctx.createRadialGradient(cx,shipCY,4,cx,shipCY,destH*0.85);
+    halo.addColorStop(0,'rgba(255,255,255,0.10)'); halo.addColorStop(0.4,ship.color); halo.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.globalAlpha=0.16; ctx.fillStyle=halo; ctx.fillRect(cx-destH,shipCY-destH,destH*2,destH*2);
+    ctx.restore();
+
+    // the ship itself: untouched pixel-art sprite, turned by the same drag/auto-spin angle
+    ctx.save();
+    ctx.translate(cx, Math.round(shipCY)); ctx.scale(sx,1);
+    PixelSprites.draw(ctx, sprite, destW, destH);
+    const edge=(1-Math.abs(ca))*0.42;     // darker as it turns away from the key light
+    if(edge>0.01){ ctx.globalAlpha=edge; PixelSprites.draw(ctx, dark, destW, destH); }
+    ctx.restore();
+
+    // engine glow (additive)
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const eg=ctx.createRadialGradient(cx,shipBottom-6,1,cx,shipBottom-6,18);
+    eg.addColorStop(0,'rgba(255,170,90,'+(0.55*Math.abs(ca)*(0.8+0.2*Math.sin(t*14)))+')'); eg.addColorStop(1,'rgba(255,120,40,0)');
+    ctx.fillStyle=eg; ctx.fillRect(cx-20,shipBottom-26,40,40);
+    ctx.restore();
+
+    // drifting dust motes catching the light
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    for(let i=0;i<16;i++){
+      const px=cx+Math.sin(t*0.25+i*2.1)*w*0.17+Math.sin(i*5.3)*w*0.06;
+      const py=h*0.18+((t*6+i*37)%(padY-h*0.18));
+      ctx.globalAlpha=0.35+0.3*Math.sin(t*2+i);
+      ctx.fillStyle='#cfe8ff'; ctx.fillRect(Math.round(px),Math.round(py),i%3===0?2:1,i%3===0?2:1);
+    }
+    ctx.restore();
+  },
+};
+
+function enemyPalette(color){
+  return { H:color, S:'#1c1420', A:'#ffffff', W:'#12141a', E:'#ffcf6b' };
+}
+
+const BOSS_PALETTE = { H:'#1a2138', S:'#0d1220', P:'#232c48', W:'#0e1424', R:'#ff4d5e', L:'#3a4a72' };
+
+// One unique special per ship (press E on PC / SPECIAL button on mobile). Cooldown in seconds.
+const SPECIALS = {
+  vanguard:{ name:'OVERDRIVE BURST', cooldown:12, desc:'Ráfaga frontal amplia de gran daño.' },
+  phantom: { name:'PHASE STRIKE',    cooldown:10, desc:'Embestida invulnerable que atraviesa enemigos.' },
+  titan:   { name:'FORTRESS CANNON', cooldown:16, desc:'Carga lenta y disparo pesado que lo atraviesa todo.' },
+  razor:   { name:'OVERCHARGE',      cooldown:13, desc:'Torrente de disparos rapidísimos.' },
+  oracle:  { name:'DRONE SWARM',     cooldown:15, desc:'Drones que disparan solos durante unos segundos.' },
+  eclipse: { name:'SINGULARITY',     cooldown:18, desc:'Pozo gravitatorio que arrastra enemigos y estalla.' },
+};
+
+function computePlayerStats(save){
+  const ship = SHIPS.find(s=>s.id === save.shipId) || SHIPS[0];
+  const lv = save.upgrades;
+  const healthMult = 1 + 0.12*(lv.hull-1);
+  const shieldMult = 1 + 0.12*(lv.shield-1);
+  const speedMult  = 1 + 0.08*(lv.engine-1);
+  const dmgMult    = 1 + 0.14*(lv.weapon-1);
+  const fireMult   = 1 + 0.11*(lv.firecontrol-1);
+  const rangeMult  = 1 + 0.10*(lv.targeting-1);
+  return {
+    ship,
+    maxHealth: Math.round(ship.maxHealth * 3 * healthMult),
+    maxShield: Math.round(ship.maxShield * 3 * shieldMult),
+    speed: ship.moveSpeed * 2.6 * speedMult,             // px/sec
+    damage: Math.round(ship.damage * 0.30 * dmgMult),
+    fireCooldown: (52000 / ship.fireRate) / fireMult,    // ms between shots
+    range: ship.range * 3.6 * rangeMult,
+    projectileSpeed: 620,
+  };
+}
+
+class Player{
+  constructor(stats, canvasW, canvasH){
+    this.stats = stats;
+    this.radius = 16;
+    this.x = canvasW/2;
+    this.y = canvasH - 100;
+    this.health = stats.maxHealth;
+    this.shield = stats.maxShield;
+    this.fireTimer = 0;
+    this.invuln = 0;
+    this.alive = true;
+    this.flashTimer = 0;
+    this.muzzleFlash = 0; // ms remaining on the visual muzzle flash (cosmetic only)
+    // special attack state (see Game.useSpecial / updateSpecial)
+    const sd = SPECIALS[stats.ship.id] || {cooldown:12};
+    this.specialMax = sd.cooldown*1000;
+    this.specialCd = 0;     // ms until the special is ready again
+    this.sp = null;         // active special data while it is running
+    this.phasing = false;   // Phantom's Phase Strike: untouchable while true
+    this.slowMult = 1;      // Titan's cannon wind-up slows movement
+    this.ghosts = [];       // Phase Strike afterimages
+  }
+  get color(){ return this.stats.ship.color; }
+  // untouchable ONLY while Phantom's PHASE STRIKE is active (derived from the special itself)
+  get immune(){ return !!(this.sp && this.sp.type==='phantom') || this.phasing; }
+
+  update(dt, input, bounds){
+    const spd = this.stats.speed * (this.slowMult||1);
+    let vx = input.x, vy = input.y;
+    const len = Math.hypot(vx,vy);
+    if(len > 1){ vx/=len; vy/=len; }
+    this.x += vx * spd * dt;
+    this.y += vy * spd * dt;
+    this.x = clamp(this.x, bounds.left + this.radius, bounds.right - this.radius);
+    this.y = clamp(this.y, bounds.top + this.radius, bounds.bottom - this.radius);
+
+    if(this.fireTimer > 0) this.fireTimer -= dt*1000;
+    if(this.invuln > 0) this.invuln -= dt*1000;
+    if(this.flashTimer > 0) this.flashTimer -= dt*1000;
+    if(this.muzzleFlash > 0) this.muzzleFlash -= dt*1000;
+    // no shield regeneration during battle — damage to the shield persists until the
+    // next planet is reached, where a fresh Player instance starts at full shield.
+  }
+
+  canFire(){ return this.fireTimer <= 0; }
+  fire(){ this.fireTimer = this.stats.fireCooldown; this.muzzleFlash = 90; }
+
+  takeDamage(amount, ignoreInvuln){
+    // ignoreInvuln: only used by the boss's sustained hazards (laser / WORLD BREAKER) so their
+    // per-frame damage isn't swallowed by the short i-frames that follow a normal hit
+    if(this.immune || (this.invuln > 0 && !ignoreInvuln) || !this.alive) return;
+    this.flashTimer = 140;
+    if(this.shield > 0){
+      const absorbed = Math.min(this.shield, amount);
+      this.shield -= absorbed;
+      amount -= absorbed;
+    }
+    if(amount > 0){
+      this.health -= amount;
+      this.invuln = 260;
+    }
+    if(this.health <= 0){ this.health = 0; this.alive = false; }
+  }
+
+  draw(ctx){
+    const {x,y} = this;
+    const ship = this.stats.ship;
+    const grid = SHIP_SPRITE_GRIDS[ship.id] || SHIP_SPRITE_GRIDS.vanguard;
+    const sprite = PixelSprites.getHMirrored('ship:'+ship.id, grid, shipPalette(ship));
+    const destW = 34, destH = sprite.height/sprite.width*34; // preserve the grid's aspect ratio
+
+    ctx.save();
+    ctx.translate(x,y);
+    if(this.flashTimer > 0 && Math.floor(this.flashTimer/40)%2===0){
+      ctx.globalAlpha = 0.55;
+    }
+    if(this.phasing) ctx.globalAlpha = 0.45;
+
+    // animated engine glow behind the hull (pulses with time), anchored near the tail
+    const engineY = destH/2 - 6;
+    const pulse = 0.75 + 0.25*Math.sin(performance.now()/90);
+    const grad = ctx.createRadialGradient(0,engineY,1,0,engineY,15*pulse);
+    grad.addColorStop(0,'rgba(255,200,120,0.9)');
+    grad.addColorStop(1,'rgba(255,200,120,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,engineY,14*pulse,0,Math.PI*2); ctx.fill();
+
+    // pixel-art hull, scaled up crisply from the tiny sprite grid
+    PixelSprites.draw(ctx, sprite, destW, destH);
+
+    // muzzle flash at the nose tip, brief and bright
+    if(this.muzzleFlash > 0){
+      const a = this.muzzleFlash/90;
+      ctx.save();
+      ctx.globalAlpha *= a;
+      ctx.fillStyle = '#fff2c8';
+      ctx.beginPath(); ctx.arc(0,-destH/2+2,3.5*a+1.5,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    if(this.shield > this.stats.maxShield*0.001){
+      ctx.strokeStyle = `rgba(79,216,232,${0.18 + 0.22*(this.shield/this.stats.maxShield)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+class Projectile{
+  constructor(x,y,vx,vy,damage,radius,color,friendly,maxDist){
+    this.x=x; this.y=y; this.vx=vx; this.vy=vy;
+    this.damage=damage; this.radius=radius||3.5; this.color=color||'#4fd8e8';
+    this.friendly=friendly; this.dead=false;
+    this.traveled=0; this.maxDist=maxDist||9999;
+  }
+  update(dt, homingTarget){
+    // optional slight homing (used by some boss missiles only; regular projectiles
+    // never set `this.homing`, so their trajectory is completely unaffected)
+    if(this.homing && homingTarget){
+      const desiredAng = Math.atan2(homingTarget.y-this.y, homingTarget.x-this.x);
+      const curAng = Math.atan2(this.vy, this.vx);
+      let diff = desiredAng - curAng;
+      while(diff > Math.PI) diff -= Math.PI*2;
+      while(diff < -Math.PI) diff += Math.PI*2;
+      const maxTurn = (this.homingTurnRate||1.5) * dt;
+      const turn = clamp(diff, -maxTurn, maxTurn);
+      const newAng = curAng + turn;
+      const spd = Math.hypot(this.vx, this.vy);
+      this.vx = Math.cos(newAng)*spd;
+      this.vy = Math.sin(newAng)*spd;
+    }
+    const dx=this.vx*dt, dy=this.vy*dt;
+    this.x+=dx; this.y+=dy;
+    this.traveled += Math.hypot(dx,dy);
+    if(this.traveled > this.maxDist) this.dead = true;
+  }
+  draw(ctx){
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    const ang = Math.atan2(this.vy,this.vx);
+    ctx.rotate(ang);
+    ctx.fillStyle = this.color;
+    ctx.shadowColor = this.color; ctx.shadowBlur = this.glow || 8;
+    ctx.beginPath();
+    ctx.ellipse(0,0,this.radius*2.2,this.radius*0.9,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+class Enemy{
+  constructor(type, x, y, tier){
+    const def = ENEMY_TYPES[type];
+    this.type = type;
+    this.def = def;
+    const tierMult = 1 + 0.22*(tier-1);
+    this.maxHealth = Math.round(def.health * tierMult);
+    this.health = this.maxHealth;
+    this.damage = Math.round(def.damage * (1 + 0.13*(tier-1)));
+    this.speed = def.speed * (1 + 0.05*(tier-1));
+    this.radius = def.radius;
+    this.x = x; this.y = y;
+    this.fireTimer = rand(400, def.fireRate || 1000);
+    this.dead = false;
+    this.reward = def.reward + Math.round(def.reward*0.30*(tier-1)); // pays more as planets get harder
+    this.t = Math.random()*1000;
+    this.phase = Math.random()*Math.PI*2;
+    this.hitFlash = 0;     // cosmetic: brief white flash on taking damage
+    this.muzzleFlash = 0;  // cosmetic: brief flash at the gun when firing
+  }
+  update(dt, player, bounds, onShoot){
+    this.t += dt;
+    if(this.hitFlash > 0) this.hitFlash -= dt*1000;
+    if(this.muzzleFlash > 0) this.muzzleFlash -= dt*1000;
+    const behavior = this.def.behavior;
+    if(behavior === 'ram'){
+      const ang = Math.atan2(player.y-this.y, player.x-this.x);
+      this.x += Math.cos(ang)*this.speed*60*dt;
+      this.y += Math.sin(ang)*this.speed*40*dt + this.speed*40*dt;
+    } else if(behavior === 'zigzag'){
+      this.x += Math.sin(this.t*3+this.phase) * 90 * dt;
+      this.y += this.speed*70*dt;
+    } else if(behavior === 'shoot'){
+      this.y += this.speed*55*dt;
+      this.x += Math.sin(this.t*1.2+this.phase)*24*dt;
+    } else { // aim — heavier ships now sway too, just slower and wider than the light ones
+      this.y += this.speed*45*dt;
+      this.x += Math.sin(this.t*0.7+this.phase) * (18*this.speed) * dt;
+    }
+    this.x = clamp(this.x, bounds.left+this.radius, bounds.right-this.radius);
+
+    if((behavior==='shoot' || behavior==='aim') && this.def.fireRate>0){
+      this.fireTimer -= dt*1000;
+      if(this.fireTimer <= 0 && this.y > bounds.top && this.y < bounds.bottom - 40){
+        this.fireTimer = this.def.fireRate * rand(0.85,1.15);
+        this.muzzleFlash = 90;
+        onShoot(this);
+      }
+    }
+    if(this.y - this.radius > bounds.bottom + 40) this.dead = true; // off-screen cleanup
+  }
+  takeDamage(amount){
+    this.health -= amount;
+    this.hitFlash = 110;
+    if(this.health <= 0){ this.health=0; this.dead = true; return true; }
+    return false;
+  }
+  draw(ctx){
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    const c = { scout:'#ff9f4a', raider:'#ff6b5e', gunship:'#e85c9e', interceptor:'#b98cf0', destroyer:'#ff4d5e' }[this.type];
+    const grid = ENEMY_SPRITE_GRIDS[this.type].half;
+    const sprite = PixelSprites.getHMirrored('enemy:'+this.type, grid, enemyPalette(c));
+    const r = this.radius;
+    const destW = r*2.3, destH = sprite.height/sprite.width*destW;
+
+    // faint colored glow behind the hull, ties back to the existing type-color identity
+    const glow = ctx.createRadialGradient(0,0,1,0,0,r*1.3);
+    glow.addColorStop(0, c+'55'); glow.addColorStop(1, c+'00');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,r*1.3,0,Math.PI*2); ctx.fill();
+
+    // grid is authored with the nose as the last row, which renders at +y (downward,
+    // toward the player) with no rotation needed
+    PixelSprites.draw(ctx, sprite, destW, destH);
+
+    // brief muzzle flash at the front tip
+    if(this.muzzleFlash > 0){
+      ctx.fillStyle = '#fff2c8';
+      ctx.beginPath(); ctx.arc(0, destH/2-2, 3*(this.muzzleFlash/90)+1.2, 0, Math.PI*2); ctx.fill();
+    }
+    // brief white damage flash (a cached white silhouette of the same sprite, drawn on top)
+    if(this.hitFlash > 0){
+      const whiteSprite = PixelSprites.getHMirroredWhite('enemy:'+this.type, grid, enemyPalette(c));
+      ctx.globalAlpha = clamp(this.hitFlash/110, 0, 1) * 0.85;
+      PixelSprites.draw(ctx, whiteSprite, destW, destH);
+      ctx.globalAlpha = 1;
+    }
+
+    // health sliver
+    if(this.health < this.maxHealth){
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(-r, -r-10, r*2, 3);
+      ctx.fillStyle = '#5cd98a';
+      ctx.fillRect(-r, -r-10, r*2*(this.health/this.maxHealth), 3);
+    }
+    ctx.restore();
+  }
+}
+
+class Asteroid{
+  constructor(x,y,size,bounds){
+    this.size = size; // 'small'|'medium'|'large'
+    const cfg = { small:{r:12,hp:8,reward:2}, medium:{r:22,hp:20,reward:4}, large:{r:34,hp:38,reward:7} }[size];
+    this.radius = cfg.r; this.maxHealth = cfg.hp; this.health = cfg.hp;
+    this.x=x; this.y=y;
+    this.vy = rand(50,110) * (size==='large'?0.7:1);
+    this.vx = rand(-30,30);
+    this.rot = rand(0,Math.PI*2);
+    this.rotSpeed = rand(-1,1);
+    this.special = Math.random() < 0.12;
+    // regular asteroids yield a small reward; special (golden) ones yield much more, per design brief
+    this.reward = this.special ? cfg.reward * 5 : cfg.reward;
+    this.dead=false;
+    this.shape = [];
+    const n = 7 + Math.floor(Math.random()*3);
+    for(let i=0;i<n;i++){
+      const a = (i/n)*Math.PI*2;
+      this.shape.push({a, r: this.radius*(0.78+Math.random()*0.34)});
+    }
+  }
+  update(dt, bounds){
+    this.x += this.vx*dt; this.y += this.vy*dt;
+    this.rot += this.rotSpeed*dt;
+    if(this.x < bounds.left+this.radius || this.x > bounds.right-this.radius) this.vx *= -1;
+    if(this.y - this.radius > bounds.bottom+40) this.dead = true;
+  }
+  takeDamage(amount){
+    this.health -= amount;
+    if(this.health<=0){ this.health=0; this.dead=true; return true; }
+    return false;
+  }
+  draw(ctx){
+    ctx.save();
+    ctx.translate(this.x,this.y); ctx.rotate(this.rot);
+    ctx.fillStyle = this.special ? '#e8c84f' : '#5c6885';
+    ctx.strokeStyle = this.special ? '#fff3c2' : '#8a97b3';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    this.shape.forEach((p,i)=>{
+      const px = Math.cos(p.a)*p.r, py = Math.sin(p.a)*p.r;
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    });
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    if(this.special){
+      ctx.fillStyle = 'rgba(232,200,79,0.5)';
+      ctx.beginPath(); ctx.arc(0,0,this.radius*0.3,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+class Particle{
+  constructor(x,y,vx,vy,life,color,size){
+    this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.life=life;this.maxLife=life;
+    this.color=color;this.size=size||3;this.dead=false;
+  }
+  update(dt){
+    this.x+=this.vx*dt; this.y+=this.vy*dt;
+    this.vx *= 0.96; this.vy *= 0.96;
+    this.life -= dt*1000;
+    if(this.life<=0) this.dead=true;
+  }
+  draw(ctx){
+    const a = clamp(this.life/this.maxLife,0,1);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = this.color;
+    // pixel-block explosion debris instead of soft circles, for a chunkier pixel-art look
+    const s = Math.max(2, Math.round(this.size*a*2));
+    ctx.fillRect(Math.round(this.x - s/2), Math.round(this.y - s/2), s, s);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* =========================================================================
+   BOSS — THE WORLDBREAKER (fully original design: no Death Star references)
+   A colossal elongated dreadnought hull with a glowing spine core.
+
+   Attack model: the boss runs one named "routine" at a time (a short,
+   hand-timed sequence of telegraphed shots/movement), then opens a brief
+   "vulnerable" window (bonus damage) before picking its next routine. This
+   keeps difficulty coming from *patterns and timing* rather than raw HP.
+   Every dangerous attack is telegraphed before it can hurt the player.
+   ========================================================================= */
+class Boss{
+  constructor(bounds){
+    this.bounds = bounds;
+    this.x = bounds.left + (bounds.right-bounds.left)/2;
+    this.y = 150;
+    this.width = 260; this.height = 130;
+    this.maxHealth = 19000;
+    this.health = this.maxHealth;
+    this.phase = 1;
+    this.dead = false;
+    this.t = 0;
+    this.coreExposed = false;
+    this.hitFlash = 0;
+    this.defeated = false;
+    this.deathTimer = 0;
+
+    // attack routine scheduler
+    this.routine = null;
+    this.routineTimer = 0;
+    this.routineStep = 0;
+    this.lastRoutine = null;
+    this._firstRoutineDelay = 1200; // brief calm opening so the player can get oriented
+
+    // brief bonus-damage window granted after finishing a routine (or after WORLD BREAKER)
+    this.vulnerable = false;
+    this.vulnerableTimer = 0;
+
+    // telegraphed laser hazard (see the laser_sweep / double_laser routines)
+    this.laser = null;
+
+    // one-time climactic special attack, unlocked deep into phase 3 — see _updateWorldBreaker()
+    this.worldBreaker = { state:'idle', timer:0, safeSide:'left', used:false, _midPulse:false, _shakeStarted:false };
+  }
+  phaseForHealth(){
+    const pct = this.health / this.maxHealth;
+    if(pct > 0.65) return 1;
+    if(pct > 0.30) return 2;
+    return 3;
+  }
+  leftTurret(){ return { x:this.x-95, y:this.y+8 }; }
+  rightTurret(){ return { x:this.x+105, y:this.y-2 }; }
+  _dmg(){ return 9 + this.phase*3; } // per-shot baseline; most routines fire several shots
+  _fireAt(cbs, x, y, angle, speed, dmg, opts){
+    opts = opts || {};
+    cbs.onFireProjectile && cbs.onFireProjectile({
+      x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+      damage: dmg, homing: opts.homing||0, homingTurnRate: opts.homingTurnRate||0,
+    });
+  }
+  _enterVulnerable(ms){
+    // punish windows shrink a bit each phase, so pressure ramps up progressively
+    const scale = this.phase===1 ? 1 : this.phase===2 ? 0.85 : 0.72;
+    this.vulnerable = true;
+    this.vulnerableTimer = ms * scale;
+  }
+
+  _pickRoutine(){
+    // 'reinforcements' is duplicated in the phase 2/3 pools so it comes up clearly more
+    // often (more small ships on screen as the fight escalates), without a parallel system.
+    const pools = {
+      1: ['aimed_triple','fan_sweep','homing_pair'],
+      2: ['aimed_triple','fan_sweep','homing_pair','cross_barrage','laser_sweep','reinforcements','reinforcements'],
+      3: ['fan_sweep','homing_pair','cross_barrage','laser_sweep','reinforcements','reinforcements','reinforcements','spiral_barrage','double_laser'],
+    };
+    const pool = pools[this.phase] || pools[1];
+    let pick = pool[randInt(0,pool.length-1)];
+    if(pool.length>1 && pick === this.lastRoutine){
+      pick = pool[(pool.indexOf(pick)+1) % pool.length];
+    }
+    this.lastRoutine = pick;
+    return pick;
+  }
+
+  update(dt, player, bounds, cbs){
+    if(this.defeated){
+      this.deathTimer += dt*1000;
+      return;
+    }
+    this.t += dt;
+    this.hitFlash = Math.max(0, this.hitFlash - dt*1000);
+    if(this.vulnerableTimer > 0){
+      this.vulnerableTimer -= dt*1000;
+      if(this.vulnerableTimer <= 0){ this.vulnerableTimer = 0; this.vulnerable = false; }
+    }
+    if(this.laser){ this.laser.timer += dt*1000; this.laser.ox = this.x; this.laser.oy = this.y+10; }
+
+    const newPhase = this.phaseForHealth();
+    if(newPhase !== this.phase){
+      this.phase = newPhase;
+      this.routine = null; // pick a routine suited to the new phase right away
+      cbs.onPhaseChange && cbs.onPhaseChange(this.phase);
+    }
+    this.coreExposed = (this.phase === 3) && this.worldBreaker.state === 'idle';
+
+    // ---- WORLD BREAKER: one-time climactic special attack, deep into phase 3 ----
+    if(this.worldBreaker.state === 'idle' && !this.worldBreaker.used && this.phase === 3 && this.health <= this.maxHealth*0.18){
+      this.worldBreaker.state = 'charging';
+      this.worldBreaker.timer = 0;
+      this.worldBreaker.safeSide = Math.random() < 0.5 ? 'left' : 'right';
+      this.worldBreaker._midPulse = false;
+      this.worldBreaker._shakeStarted = false;
+      this.routine = null; this.laser = null;
+      this.vulnerable = false; this.vulnerableTimer = 0;
+      cbs.onMessage && cbs.onMessage('¡EL WORLDBREAKER ESTÁ CARGANDO UN ATAQUE MASIVO!');
+      cbs.onBossAlert && cbs.onBossAlert();
+    }
+
+    if(this.worldBreaker.state !== 'idle'){
+      this._updateWorldBreaker(dt, player, bounds, cbs);
+      return; // boss holds position and does nothing else during the set-piece
+    }
+
+    // ---- normal drifting movement, scaled per phase ("movimiento moderado" from phase 2 on) ----
+    const spanMult  = this.phase===1 ? 0.22 : this.phase===2 ? 0.34 : 0.42;
+    const speedMult = this.phase===1 ? 0.12 : this.phase===2 ? 0.20 : 0.28;
+    const bobAmp    = this.phase===1 ? 10   : this.phase===2 ? 16   : 20;
+    const bobSpeed  = this.phase===1 ? 0.35 : this.phase===2 ? 0.45 : 0.55;
+    const spanX = (bounds.right-bounds.left)*spanMult;
+    const centerX = bounds.left + (bounds.right-bounds.left)/2;
+    this.x = centerX + Math.sin(this.t*speedMult)*spanX;
+    this.y = 120 + Math.sin(this.t*bobSpeed)*bobAmp;
+
+    // ---- attack routine scheduler ----
+    if(!this.routine){
+      if(this._firstRoutineDelay > 0){
+        this._firstRoutineDelay -= dt*1000;
+      } else {
+        this.routine = this._pickRoutine();
+        this.routineTimer = 0;
+        this.routineStep = 0;
+      }
+    } else {
+      this.routineTimer += dt*1000;
+      this._runRoutine(dt, player, bounds, cbs);
+    }
+
+    if(this.phase >= 2 && cbs.onSpawn){
+      // reinforcements routine handles most spawns; nothing extra needed here
+    }
+  }
+
+  _runRoutine(dt, player, bounds, cbs){
+    const T = this.routineTimer;
+    const step = ()=> this.routineStep++;
+
+    switch(this.routine){
+
+      case 'aimed_triple': { // phase 1+: three aimed shots, small dodge windows between them
+        const shotTimes = [300,450,600];
+        shotTimes.forEach((tm,i)=>{
+          if(this.routineStep===i && T>=tm){
+            const ang = Math.atan2(player.y-this.y, player.x-this.x);
+            this._fireAt(cbs, this.x, this.y+20, ang, 260+this.phase*20, this._dmg(), {});
+            step();
+          }
+        });
+        if(this.routineStep===3 && T>=750){ this._enterVulnerable(1200); step(); }
+        if(T>=1950) this.routine = null;
+        break;
+      }
+
+      case 'fan_sweep': { // phase 1+: wide fan, forces lateral movement to find the gap
+        if(this.routineStep===0 && T>=0){ this._aimLock = Math.atan2(player.y-this.y, player.x-this.x); step(); }
+        if(this.routineStep===1 && T>=400){
+          const n=7+(this.phase-1), spread=Math.PI*0.55; // one extra bolt per phase above 1
+          for(let i=0;i<n;i++){
+            const a = this._aimLock - spread/2 + spread*(i/(n-1));
+            this._fireAt(cbs, this.x, this.y+20, a, 210+this.phase*15, this._dmg()*0.85, {});
+          }
+          step();
+        }
+        if(this.routineStep===2 && T>=500){ this._enterVulnerable(1000); step(); }
+        if(T>=1500) this.routine = null;
+        break;
+      }
+
+      case 'homing_pair': { // phase 1+: two gently-tracking missiles, dodgeable with a decisive turn
+        if(this.routineStep===0 && T>=300){
+          const t = this.leftTurret();
+          const ang = Math.atan2(player.y-t.y, player.x-t.x);
+          this._fireAt(cbs, t.x, t.y, ang, 150, this._dmg()*0.8, {homing:0.9, homingTurnRate:1.4+this.phase*0.15});
+          step();
+        }
+        if(this.routineStep===1 && T>=650){
+          const t = this.rightTurret();
+          const ang = Math.atan2(player.y-t.y, player.x-t.x);
+          this._fireAt(cbs, t.x, t.y, ang, 150, this._dmg()*0.8, {homing:0.9, homingTurnRate:1.4+this.phase*0.15});
+          step();
+        }
+        if(this.routineStep===2 && T>=900){ this._enterVulnerable(1300); step(); }
+        if(T>=2200) this.routine = null;
+        break;
+      }
+
+      case 'cross_barrage': { // phase 2+: frontal + both lateral turrets at once
+        if(this.routineStep===0 && T>=350){
+          const ang = Math.atan2(player.y-this.y, player.x-this.x);
+          for(let i=-1;i<=1;i++) this._fireAt(cbs, this.x, this.y+20, ang+i*0.18, 260, this._dmg(), {});
+          const lt=this.leftTurret(), rt=this.rightTurret();
+          this._fireAt(cbs, lt.x, lt.y, Math.PI*0.65, 230, this._dmg()*0.9, {});
+          this._fireAt(cbs, lt.x, lt.y, Math.PI*0.5, 230, this._dmg()*0.9, {});
+          this._fireAt(cbs, rt.x, rt.y, Math.PI*0.35, 230, this._dmg()*0.9, {});
+          this._fireAt(cbs, rt.x, rt.y, Math.PI*0.5, 230, this._dmg()*0.9, {});
+          step();
+        }
+        if(this.routineStep===1 && T>=450){ this._enterVulnerable(900); step(); }
+        if(T>=1350) this.routine = null;
+        break;
+      }
+
+      case 'laser_sweep': { // phase 2+: clearly telegraphed beam, locked-in during the warning
+        if(this.routineStep===0 && T>=0){
+          const ang = Math.atan2(player.y-this.y, player.x-this.x);
+          this.laser = { state:'warn', angle:ang, ox:this.x, oy:this.y+10, timer:0 };
+          cbs.onMessage && cbs.onMessage('¡LÁSER CARGANDO!');
+          step();
+        }
+        if(this.routineStep===1 && this.laser && this.laser.timer>=1000){ this.laser.state='firing'; this.laser.timer=0; step(); }
+        if(this.routineStep===2 && this.laser && this.laser.timer>=600){ this.laser=null; this._enterVulnerable(1000); step(); }
+        if(T>=2700){ this.routine=null; this.laser=null; }
+        break;
+      }
+
+      case 'reinforcements': { // phase 2+: calls in backup, capped and short-lived — now sends
+        // clearly more ships per call (2 in phase 2, 3 in phase 3) for more sustained pressure.
+        if(this.routineStep===0 && T>=300){ cbs.onSpawn && cbs.onSpawn(this.phase>=3?'interceptor':'scout'); step(); }
+        if(this.routineStep===1 && T>=600){ cbs.onSpawn && cbs.onSpawn('scout'); step(); }
+        if(this.routineStep===2 && T>=900){ if(this.phase>=3) cbs.onSpawn && cbs.onSpawn('interceptor'); step(); }
+        if(this.routineStep===3 && T>=1100){
+          const ang = Math.atan2(player.y-this.y, player.x-this.x);
+          this._fireAt(cbs, this.x, this.y+20, ang-0.12, 240, this._dmg()*0.8, {});
+          this._fireAt(cbs, this.x, this.y+20, ang+0.12, 240, this._dmg()*0.8, {});
+          step();
+        }
+        if(this.routineStep===4 && T>=1600){ this._enterVulnerable(600); step(); }
+        if(T>=2300) this.routine = null;
+        break;
+      }
+
+      case 'spiral_barrage': { // phase 3 only: rotating spray with a rotating safe gap
+        if(this.routineStep===0 && T>=500){ this._spiralBase = Math.random()*Math.PI*2; this._spiralFired=0; step(); }
+        if(this.routineStep===1 && T>=500){
+          const elapsed = T-500;
+          const shotsDue = Math.min(16, Math.floor(elapsed/90));
+          while(this._spiralFired < shotsDue){
+            const ang = this._spiralBase + this._spiralFired*0.62;
+            const gap = ((ang % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+            const inGap = gap > Math.PI*0.75 && gap < Math.PI*1.05;
+            if(!inGap) this._fireAt(cbs, this.x, this.y+20, ang, 200, this._dmg()*0.75, {});
+            this._spiralFired++;
+          }
+          if(this._spiralFired>=16) step();
+        }
+        if(this.routineStep===2 && T>=2000){ this._enterVulnerable(800); step(); }
+        if(T>=2900) this.routine = null;
+        break;
+      }
+
+      case 'double_laser': { // phase 3 only: two beams from different angles in quick succession
+        if(this.routineStep===0 && T>=0){
+          const ang = Math.atan2(player.y-this.y, player.x-this.x);
+          this.laser = { state:'warn', angle:ang, ox:this.x, oy:this.y+10, timer:0 };
+          step();
+        }
+        if(this.routineStep===1 && this.laser && this.laser.timer>=700){ this.laser.state='firing'; this.laser.timer=0; step(); }
+        if(this.routineStep===2 && this.laser && this.laser.timer>=450){
+          const ang2 = Math.atan2(player.y-this.y, player.x-this.x) + (Math.random()<0.5?0.5:-0.5);
+          this.laser = { state:'warn', angle:ang2, ox:this.x, oy:this.y+10, timer:0 };
+          step();
+        }
+        if(this.routineStep===3 && this.laser && this.laser.timer>=700){ this.laser.state='firing'; this.laser.timer=0; step(); }
+        if(this.routineStep===4 && this.laser && this.laser.timer>=450){ this.laser=null; this._enterVulnerable(1100); step(); }
+        if(T>=3600){ this.routine=null; this.laser=null; }
+        break;
+      }
+
+      default: this.routine = null;
+    }
+  }
+
+  _updateWorldBreaker(dt, player, bounds, cbs){
+    const wb = this.worldBreaker;
+    wb.timer += dt*1000;
+    if(wb.state === 'charging'){
+      if(wb.timer >= 1600 && !wb._midPulse){ wb._midPulse = true; cbs.onBossAlert && cbs.onBossAlert(); }
+      if(wb.timer >= 2600 && !wb._shakeStarted){ wb._shakeStarted = true; }
+      if(wb._shakeStarted) cbs.onScreenShake && cbs.onScreenShake(2 + (wb.timer-2600)/600*3);
+      if(wb.timer >= 3200){
+        wb.state = 'firing'; wb.timer = 0;
+        cbs.onMessage && cbs.onMessage('¡ESQUIVA A LA ZONA SEGURA!');
+        cbs.onScreenShake && cbs.onScreenShake(8);
+      }
+    } else if(wb.state === 'firing'){
+      cbs.onWorldBreakerTick && cbs.onWorldBreakerTick(dt, wb.safeSide);
+      if(wb.timer >= 1100){
+        wb.state = 'idle';
+        wb.used = true;
+        this._enterVulnerable(2200); // generous punish window as a reward for surviving
+        this.routine = null;
+      }
+    }
+  }
+
+  takeDamage(amount, hitCore){
+    if(this.defeated) return false;
+    let dmg = amount;
+    if(this.coreExposed && hitCore) dmg *= 2.2;       // phase-3 exposed core, unchanged bonus
+    else if(this.vulnerable) dmg *= 1.5;              // new: reward for punishing a routine's opening
+    this.health -= dmg;
+    this.hitFlash = 90;
+    if(this.health <= 0){
+      this.health = 0;
+      this.defeated = true;
+      return true;
+    }
+    return false;
+  }
+  corePos(){
+    return { x:this.x, y:this.y + 6, r: 26 };
+  }
+  draw(ctx){
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    if(this.defeated){
+      ctx.globalAlpha = clamp(1 - this.deathTimer/2600, 0, 1);
+    }
+
+    // pixel-art hull, scaled to match the original hull's extents exactly
+    // (span -130..150 on x, so its true center sits at local x=10)
+    const sprite = PixelSprites.getVMirrored('boss:hull', BOSS_SPRITE_TOP, BOSS_PALETTE);
+    const destW = 280, destH = destW * (sprite.height/sprite.width);
+    ctx.save();
+    ctx.translate(10, 0);
+    PixelSprites.draw(ctx, sprite, destW, destH);
+    if(this.hitFlash > 0){
+      const whiteSprite = PixelSprites.getVMirroredWhite('boss:hull', BOSS_SPRITE_TOP, BOSS_PALETTE);
+      ctx.globalAlpha *= clamp(this.hitFlash/90, 0, 1) * 0.8;
+      PixelSprites.draw(ctx, whiteSprite, destW, destH);
+    }
+    ctx.restore();
+
+    // spine energy core — glowing seam; exposed weak point in phase 3, and it
+    // blazes brighter while charging the WORLD BREAKER special attack
+    const wbCharging = this.worldBreaker.state === 'charging';
+    const wbProg = wbCharging ? clamp(this.worldBreaker.timer/3200, 0, 1) : 0;
+    const coreAlpha = wbCharging ? (0.3+0.6*wbProg) : (this.coreExposed ? (0.65 + 0.3*Math.sin(this.t*8)) : 0.22);
+    const coreR = wbCharging ? (14+42*wbProg) : (this.coreExposed ? 34 : 14);
+    const grad = ctx.createRadialGradient(0,6,2,0,6,coreR);
+    grad.addColorStop(0, `rgba(255,120,110,${coreAlpha})`);
+    grad.addColorStop(1, 'rgba(255,120,110,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,6,coreR,0,Math.PI*2); ctx.fill();
+    if(this.coreExposed || wbCharging){
+      ctx.strokeStyle = wbCharging ? `rgba(255,235,200,${0.4+0.5*wbProg})` : '#ff4d5e';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0,6,wbCharging?Math.max(coreR-4,4):26,0,Math.PI*2); ctx.stroke();
+    }
+
+    // brief "vulnerable" window feedback (bonus damage while this glows)
+    if(this.vulnerable){
+      ctx.strokeStyle = `rgba(92,217,138,${0.5+0.35*Math.sin(this.t*10)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(0,0,150,60,0,0,Math.PI*2); ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+/* =========================================================================
+   GAME ENGINE
+   ========================================================================= */
+const audio = new AudioManager();
+
+class StarField{
+  constructor(canvas){
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.stars = [];
+    this.nebulae = [];
+    this.resize();
+  }
+  resize(){
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    this.w = window.innerWidth; this.h = window.innerHeight;
+    this.canvas.width = this.w*dpr; this.canvas.height = this.h*dpr;
+    this.ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(this.stars.length===0){
+      const count = Math.floor((this.w*this.h)/6000);
+      for(let i=0;i<count;i++){
+        this.stars.push({ x:rand(0,this.w), y:rand(0,this.h), z:rand(0.2,1), tw: Math.random()*Math.PI*2 });
+      }
+      for(let i=0;i<4;i++){
+        this.nebulae.push({ x:rand(0,this.w), y:rand(0,this.h), r:rand(180,340), hue: [190,270,320,150][i%4], drift:rand(-3,3) });
+      }
+    }
+  }
+  update(dt, speedMult){
+    this.stars.forEach(s=>{
+      s.y += (18 + s.z*70) * dt * (speedMult||1);
+      s.tw += dt*2;
+      if(s.y > this.h){ s.y = -4; s.x = rand(0,this.w); }
+    });
+    this.nebulae.forEach(n=>{ n.x += n.drift*dt; if(n.x<-400)n.x=this.w+400; if(n.x>this.w+400)n.x=-400; });
+  }
+  draw(){
+    const ctx = this.ctx;
+    ctx.fillStyle = '#070a12';
+    ctx.fillRect(0,0,this.w,this.h);
+    this.nebulae.forEach(n=>{
+      const g = ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r);
+      g.addColorStop(0, `hsla(${n.hue},70%,55%,0.06)`);
+      g.addColorStop(1, `hsla(${n.hue},70%,55%,0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2); ctx.fill();
+    });
+    this.stars.forEach(s=>{
+      const alpha = 0.4 + 0.5*Math.abs(Math.sin(s.tw));
+      ctx.globalAlpha = alpha*s.z;
+      ctx.fillStyle = '#dfe8ff';
+      const size = 0.6 + s.z*1.6;
+      ctx.fillRect(s.x, s.y, size, size);
+    });
+    ctx.globalAlpha = 1;
+  }
+}
+
+const Game = {
+  state: 'boot',               // intro|menu|hangar|planet|options|travel|boss|pause|gameover|victory
+  save: null,
+  stats: null,                 // current-run computed player stats
+  canvas: null, ctx: null,
+  fxCanvas: null, fxCtx: null,
+  bgField: null,
+  planetHeroField: null,
+  player: null,
+  enemies: [], projectiles: [], enemyProjectiles: [], asteroids: [], particles: [],
+  boss: null,
+  screenShake: 0,              // cosmetic camera jitter amplitude (boss WORLD BREAKER only), decays each frame
+  bounds: {left:0,right:0,top:0,bottom:0},
+  input: { x:0, y:0, firing:false },
+  keys: {},
+  travel: null,                // {fromIndex, toIndex, elapsed, duration, spawnTimer, asteroidTimer, ended}
+  lastTs: 0,
+  raf: null,
+  runStartTs: 0,
+  runElapsedMs: 0,
+  paused: false,
+
+  init(){
+    this.canvas = document.getElementById('game-canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.fxCanvas = document.getElementById('fx-canvas');
+    this.fxCtx = this.fxCanvas.getContext('2d');
+    this.bgField = new StarField(document.getElementById('bg-canvas'));
+    this.resize();
+    window.addEventListener('resize', ()=> this.resize());
+    this.save = SaveManager.load();
+    audio.init(this.save.audio);
+    this.bindInput();
+    UI.init();
+    this.startBackgroundLoop();
+    UI.showIntro();
+  },
+
+  resize(){
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    const w = window.innerWidth, h = window.innerHeight;
+    [this.canvas, this.fxCanvas].forEach(c=>{
+      c.width = w*dpr; c.height = h*dpr;
+      c.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+    });
+    this.bounds = { left:0, right:w, top:0, bottom:h };
+    if(this.bgField) this.bgField.resize();
+    UI.checkOrientation();
+  },
+
+  // idle starfield animation runs even on menu screens for atmosphere
+  startBackgroundLoop(){
+    let last = performance.now();
+    const loop = (ts)=>{
+      const dt = Math.min((ts-last)/1000, 0.05); last = ts;
+      const inGameplay = this.state==='travel' || this.state==='boss' || this.state==='cinematic';
+      if(!inGameplay){
+        this.bgField.update(dt, 1);
+        this.bgField.draw();
+      }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  },
+
+  bindInput(){
+    window.addEventListener('keydown', (e)=>{
+      this.keys[e.code] = true;
+      if(this.state==='cinematic' && this.cine && this.cine.t > 1200 && (e.code==='Space' || e.code==='Enter' || e.code==='Escape')){ e.preventDefault(); this.finishCinematic(); return; }
+      if(e.code === 'Escape' && (this.state==='travel'||this.state==='boss')) this.togglePause();
+      if(e.code === 'Space') this.input.firing = true;
+      if(e.code === 'KeyE' && !e.repeat) this.useSpecial();
+      this.updateKeyVector();
+    });
+    window.addEventListener('keyup', (e)=>{
+      this.keys[e.code] = false;
+      if(e.code === 'Space') this.input.firing = false;
+      this.updateKeyVector();
+    });
+
+    // touch joystick
+    const zone = document.getElementById('tc-stick-zone');
+    const nub = document.getElementById('tc-stick-nub');
+    let stickActive=false, stickId=null, baseRect=null;
+    const setStick = (dx,dy)=>{
+      const max=40;
+      const len=Math.hypot(dx,dy);
+      const cl = len>max ? max/len : 1;
+      nub.style.transform = `translate(calc(-50% + ${dx*cl}px), calc(-50% + ${dy*cl}px))`;
+      this.input.x = clamp(dx*cl/max, -1, 1);
+      this.input.y = clamp(dy*cl/max, -1, 1);
+    };
+    const resetStick = ()=>{
+      nub.style.transform = 'translate(-50%,-50%)';
+      this.input.x=0; this.input.y=0;
+    };
+    zone.addEventListener('touchstart', (e)=>{
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      stickActive=true; stickId=t.identifier;
+      baseRect = zone.getBoundingClientRect();
+    }, {passive:false});
+    window.addEventListener('touchmove', (e)=>{
+      if(!stickActive) return;
+      for(const t of e.changedTouches){
+        if(t.identifier===stickId){
+          const cx = baseRect.left+baseRect.width/2, cy = baseRect.top+baseRect.height/2;
+          setStick(t.clientX-cx, t.clientY-cy);
+        }
+      }
+    }, {passive:true});
+    window.addEventListener('touchend', (e)=>{
+      for(const t of e.changedTouches){ if(t.identifier===stickId){ stickActive=false; resetStick(); } }
+    });
+
+    const fireBtn = document.getElementById('tc-fire-btn');
+    const setFiring = (v)=>{ this.input.firing = v; fireBtn.classList.toggle('pressed', v); };
+    fireBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); setFiring(true); }, {passive:false});
+    fireBtn.addEventListener('touchend', (e)=>{ e.preventDefault(); setFiring(false); }, {passive:false});
+    fireBtn.addEventListener('mousedown', ()=> setFiring(true));
+    window.addEventListener('mouseup', ()=> setFiring(false));
+
+    const specialBtn = document.getElementById('tc-special-btn');
+    specialBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); this.useSpecial(); }, {passive:false});
+    specialBtn.addEventListener('mousedown', ()=> this.useSpecial());
+
+    document.getElementById('hud-pause-btn').addEventListener('click', ()=> this.togglePause());
+
+    // detect touch device to show virtual controls
+    this.isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
+  },
+
+  updateKeyVector(){
+    let x=0,y=0;
+    if(this.keys['KeyA']||this.keys['ArrowLeft']) x-=1;
+    if(this.keys['KeyD']||this.keys['ArrowRight']) x+=1;
+    if(this.keys['KeyW']||this.keys['ArrowUp']) y-=1;
+    if(this.keys['KeyS']||this.keys['ArrowDown']) y+=1;
+    this.input.x = x; this.input.y = y;
+  },
+
+  togglePause(){
+    if(this.state==='travel'||this.state==='boss'){
+      this.paused = true;
+      cancelAnimationFrame(this.raf);
+      UI.showScreen('screen-pause');
+    } else if(this.paused){
+      this.paused = false;
+      UI.hideOverlays();
+      document.getElementById('hud').classList.add('active');
+      document.getElementById('touch-controls').classList.toggle('active', !!this.isTouch);
+      this.lastTs = performance.now();
+      this.raf = requestAnimationFrame(this.loop.bind(this));
+    }
+  },
+
+  /* ---------------- campaign flow ---------------- */
+  beginNewCampaign(shipId){
+    this.save = defaultSave();
+    this.save.shipId = shipId;
+    this.save.hasSave = true;
+    SaveManager.data = this.save;
+    SaveManager.save();
+    // Ship chosen -> straight into the opening battle (normal reward system awards
+    // credits along the way); Veyra's shop only appears once that travel is completed.
+    this.stats = computePlayerStats(this.save);
+    this.startTravel(0, 0);
+  },
+
+  continueCampaign(){
+    this.save = SaveManager.load();
+    if(!this.save.hasSave){ UI.showScreen('screen-menu'); return; }
+    if(this.save.bossDefeated || this.save.planetIndex >= PLANETS.length-1){ UI.showVictory(); return; }
+    UI.goToPlanet(this.save.planetIndex);
+  },
+
+  departFromPlanet(){
+    const from = this.save.planetIndex;
+    const isBossTravel = from === PLANETS.length-2; // Arken -> BOSS -> Veyra
+    this.stats = computePlayerStats(this.save);
+    if(isBossTravel){
+      this.startBoss();
+    } else {
+      this.startTravel(from, from+1);
+    }
+  },
+
+  setupBounds(){
+    this.bounds = { left:0, right:window.innerWidth, top:0, bottom:window.innerHeight };
+  },
+
+  resetEntities(){
+    this.enemies=[]; this.projectiles=[]; this.enemyProjectiles=[]; this.asteroids=[]; this.particles=[];
+  },
+
+  startTravel(fromIndex, toIndex){
+    this.setupBounds();
+    this.resetEntities();
+    this.player = new Player(this.stats, this.bounds.right, this.bounds.bottom);
+    const tier = PLANETS[fromIndex].tier;
+    const duration = 26 + tier*4.2;
+    this.travel = { fromIndex, toIndex, elapsed:0, duration, spawnTimer:1200, asteroidTimer:900, tier, ending:false };
+    this.mode = 'travel';
+    this.state = 'travel';
+    this.runElapsedMs = 0;
+    UI.enterGameplay(PLANETS[toIndex].name);
+    audio.startMusic('travel');
+    this.lastTs = performance.now();
+    this.raf = requestAnimationFrame(this.loop.bind(this));
+  },
+
+  startBoss(){
+    this.setupBounds();
+    this.resetEntities();
+    this.player = new Player(this.stats, this.bounds.right, this.bounds.bottom);
+    this.boss = new Boss(this.bounds);
+    this.mode = 'boss';
+    this.state = 'boss';
+    this.runElapsedMs = 0;
+    UI.enterGameplay('THE WORLDBREAKER', true);
+    UI.flashMessage('¡ALERTA DE COMBATE!');
+    audio.bossAlert();
+    audio.startMusic('boss');
+    this.lastTs = performance.now();
+    this.raf = requestAnimationFrame(this.loop.bind(this));
+  },
+
+  spawnEnemy(type){
+    const tier = this.mode === 'boss' ? 5 : (this.travel ? this.travel.tier : 5);
+    const x = rand(this.bounds.left+40, this.bounds.right-40);
+    this.enemies.push(new Enemy(type, x, -30, tier));
+  },
+
+  pickEnemyType(tier){
+    // weighted by each type's own minTier, so higher-tier (tougher) enemies become
+    // proportionally more common as the travel tier climbs, instead of a flat uniform pick
+    const pool = Object.keys(ENEMY_TYPES).filter(k=>ENEMY_TYPES[k].minTier<=tier);
+    const weights = pool.map(k=>ENEMY_TYPES[k].minTier);
+    const total = weights.reduce((a,b)=>a+b,0);
+    let r = Math.random()*total;
+    for(let i=0;i<pool.length;i++){
+      r -= weights[i];
+      if(r<=0) return pool[i];
+    }
+    return pool[pool.length-1];
+  },
+
+  spawnAsteroid(){
+    const sizes = ['small','small','medium','medium','large'];
+    const size = sizes[randInt(0,sizes.length-1)];
+    const x = rand(this.bounds.left+40, this.bounds.right-40);
+    const ast = new Asteroid(x, -40, size, this.bounds);
+    ast.reward = Math.round(ast.reward*(1+0.2*((this.travel ? this.travel.tier : 1)-1))); // mild tier scaling
+    this.asteroids.push(ast);
+  },
+
+  spawnExplosion(x,y,color,count){
+    if(this.particles.length > 220) return; // perf cap for mobile/low-end devices
+    for(let i=0;i<(count||14);i++){
+      const ang = rand(0,Math.PI*2), spd = rand(40,240);
+      this.particles.push(new Particle(x,y, Math.cos(ang)*spd, Math.sin(ang)*spd, rand(250,600), color||'#ff9f4a', rand(2,4)));
+    }
+  },
+
+  /* ---------------- SPECIAL ATTACKS (one per ship) ---------------- */
+  specialShot(x,y,ang,speed,dmg,radius,color,range,pierce,glow){
+    const pr = new Projectile(x,y,Math.cos(ang)*speed,Math.sin(ang)*speed,dmg,radius,color,true,range);
+    if(pierce) pr.pierce = pierce;   // extra targets it can pass through (hit once each)
+    if(glow) pr.glow = glow;
+    this.projectiles.push(pr);
+    return pr;
+  },
+  specialDamage(t, dmg, isAsteroid, quiet){
+    const killed = t.takeDamage(dmg);
+    if(!quiet){ audio.hit(); this.spawnExplosion(t.x,t.y,'#c9d2e8',5); }
+    if(killed){
+      this.save.credits += t.reward;
+      if(isAsteroid) this.save.stats.asteroidsDestroyed++; else this.save.stats.enemiesDestroyed++;
+      audio.explosion(false); this.spawnExplosion(t.x,t.y,isAsteroid?'#c9d2e8':'#ff9f4a',isAsteroid?12:16);
+    }
+  },
+  useSpecial(){
+    if((this.state!=='travel' && this.state!=='boss') || this.paused) return;
+    const p = this.player;
+    if(!p || !p.alive || p.specialCd > 0 || p.sp) return;
+    const id = p.stats.ship.id;
+    if(!SPECIALS[id]) return;
+    p.specialCd = p.specialMax;
+    p.sp = { type:id, t:0, n:0 };
+    if(id==='vanguard'){ audio.explosion(false); }
+    else if(id==='phantom'){
+      p.sp.startY = p.y;
+      p.sp.dist = Math.max(120, Math.min(360, p.y - (this.bounds.top+60)));
+      p.sp.hit = new Set(); p.phasing = true; audio.shieldHit();
+    }
+    else if(id==='titan'){ p.sp.charge = 850; p.slowMult = 0.35; audio.shieldHit(); }
+    else if(id==='razor'){ p.sp.dur = 1400; }
+    else if(id==='eclipse'){
+      // anchor the well ahead of the ship; it stays put while the ship keeps moving and firing
+      p.sp.dur = 3200; p.sp.tick = 0; p.sp.wx = p.x;
+      p.sp.wy = clamp(p.y-240, this.bounds.top+140, this.bounds.bottom-160);
+      audio.shieldHit();
+    }
+    else if(id==='oracle'){
+      p.sp.dur = 8000;
+      p.sp.drones = [0,1,2,3].map(i=>({ a:i*Math.PI/2, cd:i*95, x:p.x, y:p.y }));
+      audio.upgrade();
+    }
+  },
+  updateSpecial(dt){
+    const p = this.player; if(!p) return;
+    const ms = dt*1000, ship = p.stats.ship, dmg = p.stats.damage;
+    if(p.specialCd > 0){ p.specialCd -= ms; if(p.specialCd <= 0){ p.specialCd = 0; audio.select(); } }
+    for(const g of p.ghosts) g.a -= dt*2.6;
+    p.ghosts = p.ghosts.filter(g=>g.a>0);
+    const sp = p.sp;
+    if(!p.alive || !sp){ p.phasing = false; return; }   // no special running -> normal collisions/damage
+    sp.t += ms;
+
+    if(sp.type==='vanguard'){            // OVERDRIVE BURST — four wide fan volleys, each shot pierces one extra target
+      while(sp.n < 4 && sp.t >= sp.n*110){
+        const n = 11, spread = 1.15;
+        for(let i=0;i<n;i++){
+          const a = -Math.PI/2 - spread/2 + spread*i/(n-1);
+          this.specialShot(p.x,p.y-18,a,780,dmg*1.5,5.5,ship.accent,p.stats.range*1.35,1,14);
+        }
+        p.muzzleFlash = 140; audio.shoot(); this.spawnExplosion(p.x,p.y-22,ship.accent,5);
+        if(sp.n===0) this.screenShake = Math.max(this.screenShake,5);
+        sp.n++;
+      }
+      if(sp.n >= 4) p.sp = null;
+    }
+    else if(sp.type==='phantom'){        // PHASE STRIKE — untouchable dash through everything, then phase back
+      const OUT = 380, BACK = 280;
+      let y = sp.startY;
+      if(sp.t < OUT) y = sp.startY - sp.dist*Math.sin(sp.t/OUT*Math.PI/2);
+      else if(sp.t < OUT+BACK){ const k=(sp.t-OUT)/BACK; y = sp.startY - sp.dist*(1-(1-Math.cos(k*Math.PI))/2); }
+      p.y = clamp(y, this.bounds.top+p.radius, this.bounds.bottom-p.radius);
+      p.phasing = true;
+      p.ghosts.push({x:p.x,y:p.y,a:0.9}); if(p.ghosts.length>28) p.ghosts.shift();
+      if(Math.random()<0.7) this.particles.push(new Particle(p.x+rand(-8,8),p.y+rand(8,18),rand(-30,30),rand(40,120),380,ship.color,3));
+      for(const en of this.enemies){
+        if(en.dead || sp.hit.has(en)) continue;
+        if(circleHit(p.x,p.y,p.radius+10,en.x,en.y,en.radius)){ sp.hit.add(en); this.specialDamage(en,dmg*8,false); }
+      }
+      for(const a of this.asteroids){
+        if(a.dead || sp.hit.has(a)) continue;
+        if(circleHit(p.x,p.y,p.radius+10,a.x,a.y,a.radius)){ sp.hit.add(a); this.specialDamage(a,dmg*8,true); }
+      }
+      const bs = this.boss;
+      if(this.state==='boss' && bs && !bs.defeated && !sp.hit.has('boss') && circleHit(p.x,p.y,p.radius+10,bs.x,bs.y,110)){
+        sp.hit.add('boss');
+        const killed = bs.takeDamage(dmg*14,false);
+        audio.hit(); this.spawnExplosion(p.x,p.y-10,'#b98cf0',10); this.screenShake = Math.max(this.screenShake,4);
+        if(killed){ audio.explosion(true); this.spawnExplosion(bs.x,bs.y,'#ff9f4a',60); }
+      }
+      if(sp.t >= OUT+BACK){ p.phasing = false; p.invuln = Math.max(p.invuln,350); p.sp = null; }
+    }
+    else if(sp.type==='titan'){          // FORTRESS CANNON — slow wind-up, then one enormous piercing shell
+      if(sp.t < sp.charge){
+        this.screenShake = Math.max(this.screenShake, 1.2+3*(sp.t/sp.charge));
+        if(Math.random()<0.6) this.particles.push(new Particle(p.x+rand(-30,30),p.y-26+rand(-30,4),0,0,260,'#ffb060',3));
+      } else {
+        this.specialShot(p.x,p.y-26,-Math.PI/2,540,dmg*16,17,'#ffb060',3000,99,28);
+        p.slowMult = 1;
+        p.y = Math.min(p.y+24, this.bounds.bottom-p.radius);   // recoil
+        p.muzzleFlash = 160;
+        this.screenShake = Math.max(this.screenShake,11);
+        audio.explosion(true); this.spawnExplosion(p.x,p.y-26,'#ffb060',22);
+        p.sp = null;
+      }
+    }
+    else if(sp.type==='razor'){          // OVERCHARGE — 1.4s torrent of twin rapid shots
+      const due = Math.min(Math.floor(sp.t/40)+1, Math.floor(sp.dur/40));
+      while(sp.n < due){
+        for(const ox of [-7,7]){
+          this.specialShot(p.x+ox,p.y-16,-Math.PI/2+rand(-0.05,0.05),880,dmg*0.8,3.4,ship.accent,p.stats.range*1.15,0,0);
+        }
+        if(sp.n%2===0) audio.shoot();
+        p.muzzleFlash = 90; sp.n++;
+      }
+      this.screenShake = Math.max(this.screenShake,1.6);
+      if(sp.t >= sp.dur) p.sp = null;
+    }
+    else if(sp.type==='eclipse'){        // SINGULARITY — gravity well: drags enemies in, eats enemy fire, then collapses in a blast
+      const wx = sp.wx, wy = sp.wy, PULL = 280, CORE = 120, BLAST = 190;
+      const pull = (o)=>{
+        const dx = wx-o.x, dy = wy-o.y, d = Math.hypot(dx,dy);
+        if(d < PULL && d > 1){ const s = Math.min(d, (260*(1-d/PULL)+50)*dt); o.x += dx/d*s; o.y += dy/d*s; }
+        return d;
+      };
+      this.enemies.forEach(e=>{ if(!e.dead) pull(e); });
+      this.asteroids.forEach(a=>{ if(!a.dead) pull(a); });
+      for(const pr of this.enemyProjectiles){
+        if(pull(pr) < 30){ pr.dead = true; this.particles.push(new Particle(pr.x,pr.y,rand(-40,40),rand(-40,40),300,'#ffd34f',2)); }
+      }
+      sp.tick += ms;
+      if(sp.tick >= 160){
+        sp.tick -= 160;
+        this.enemies.forEach(e=>{ if(!e.dead && Math.hypot(e.x-wx,e.y-wy) < CORE) this.specialDamage(e,dmg*0.7,false,true); });
+        this.asteroids.forEach(a=>{ if(!a.dead && Math.hypot(a.x-wx,a.y-wy) < CORE) this.specialDamage(a,dmg*0.7,true,true); });
+      }
+      if(sp.t >= sp.dur){
+        this.enemies.forEach(e=>{ if(!e.dead && Math.hypot(e.x-wx,e.y-wy) < BLAST) this.specialDamage(e,dmg*10,false); });
+        this.asteroids.forEach(a=>{ if(!a.dead && Math.hypot(a.x-wx,a.y-wy) < BLAST) this.specialDamage(a,dmg*10,true); });
+        const bs = this.boss;
+        if(this.state==='boss' && bs && !bs.defeated && Math.hypot(bs.x-wx,bs.y-wy) < BLAST+110){
+          const killed = bs.takeDamage(dmg*16,false); audio.hit();
+          if(killed){ audio.explosion(true); this.spawnExplosion(bs.x,bs.y,'#ff9f4a',60); }
+        }
+        this.screenShake = Math.max(this.screenShake,12);
+        audio.explosion(true); this.spawnExplosion(wx,wy,'#ffd34f',30); this.spawnExplosion(wx,wy,'#b98cf0',20);
+        p.sp = null;
+      }
+    }
+    else if(sp.type==='oracle'){         // DRONE SWARM — 4 orbiting drones that pick targets and fire on their own
+      const R = 48, bs = this.boss;
+      sp.drones.forEach((d,i)=>{
+        d.a += dt*2.6;
+        d.x = p.x + Math.cos(d.a)*R; d.y = p.y - 6 + Math.sin(d.a)*R*0.55;
+        d.cd -= ms;
+        if(d.cd > 0) return;
+        let best = null, bd = Infinity;
+        const consider = (t)=>{ const q=(t.x-d.x)*(t.x-d.x)+(t.y-d.y)*(t.y-d.y); if(q<bd){ bd=q; best=t; } };
+        this.enemies.forEach(e=>{ if(!e.dead) consider(e); });
+        this.asteroids.forEach(a=>{ if(!a.dead) consider(a); });
+        if(this.state==='boss' && bs && !bs.defeated) consider(bs);
+        if(best){
+          this.specialShot(d.x,d.y,Math.atan2(best.y-d.y,best.x-d.x),680,dmg*0.8,3.6,ship.accent,p.stats.range*1.8,0,10);
+          d.cd = 360; if(i%2===0) audio.shoot();
+        } else d.cd = 120;
+      });
+      if(sp.t >= sp.dur){
+        sp.drones.forEach(d=>this.spawnExplosion(d.x,d.y,ship.accent,6));
+        audio.explosion(false); p.sp = null;
+      }
+    }
+  },
+  renderSpecial(ctx){
+    const p = this.player; if(!p || !p.alive) return;
+    const ship = p.stats.ship;
+    if(p.ghosts.length){
+      const grid = SHIP_SPRITE_GRIDS[ship.id] || SHIP_SPRITE_GRIDS.vanguard;
+      const sprite = PixelSprites.getHMirrored('ship:'+ship.id, grid, shipPalette(ship));
+      const destH = sprite.height/sprite.width*34;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for(const g of p.ghosts){
+        ctx.globalAlpha = Math.max(0,g.a)*0.5;
+        ctx.save(); ctx.translate(g.x,g.y); PixelSprites.draw(ctx, sprite, 34, destH); ctx.restore();
+      }
+      ctx.restore();
+    }
+    const sp = p.sp; if(!sp) return;
+    if(sp.type==='titan'){               // charging telegraph: converging glow + the shell's lane
+      const prog = clamp(sp.t/sp.charge,0,1), nx = p.x, ny = p.y-26;
+      ctx.save();
+      ctx.strokeStyle = `rgba(255,176,96,${0.12+0.30*prog})`; ctx.lineWidth = 8+26*prog;
+      ctx.beginPath(); ctx.moveTo(nx,ny); ctx.lineTo(nx,0); ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(nx,ny,1,nx,ny,8+34*prog);
+      g.addColorStop(0,`rgba(255,220,160,${0.4+0.5*prog})`); g.addColorStop(1,'rgba(255,140,40,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(nx,ny,8+34*prog,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = `rgba(255,200,120,${0.3+0.5*prog})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(nx,ny,10+44*(1-prog),0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+    else if(sp.type==='eclipse'){        // accretion disc + blast radius; the ring brightens right before the collapse
+      const wx = sp.wx, wy = sp.wy, t = sp.t/1000, left = sp.dur - sp.t;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,211,79,0.16)'; ctx.lineWidth = 1; ctx.setLineDash([6,8]); ctx.lineDashOffset = -t*40;
+      ctx.beginPath(); ctx.arc(wx,wy,280,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+      const k = left < 700 ? 1-left/700 : 0;
+      ctx.strokeStyle = `rgba(255,240,170,${0.18+0.7*k})`; ctx.lineWidth = 2+2*k;
+      ctx.beginPath(); ctx.arc(wx,wy,190,0,Math.PI*2); ctx.stroke();
+      if(k>0){ ctx.fillStyle = `rgba(255,211,79,${0.10*k})`; ctx.beginPath(); ctx.arc(wx,wy,190,0,Math.PI*2); ctx.fill(); }
+      const g = ctx.createRadialGradient(wx,wy,4,wx,wy,74);
+      g.addColorStop(0,'rgba(0,0,0,0.95)'); g.addColorStop(0.55,'rgba(45,12,80,0.8)'); g.addColorStop(1,'rgba(255,211,79,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(wx,wy,74,0,Math.PI*2); ctx.fill();
+      for(let i=0;i<3;i++){
+        ctx.strokeStyle = `rgba(255,211,79,${0.6-i*0.14})`; ctx.lineWidth = 3-i;
+        const a0 = t*(3.2-i)+i*2;
+        ctx.beginPath(); ctx.arc(wx,wy,34+i*18,a0,a0+Math.PI*1.2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    else if(sp.type==='oracle'){         // drones + faint orbit ring; blink when about to expire
+      const left = sp.dur - sp.t, blink = left < 1500 && Math.floor(left/120)%2===0;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(155,240,188,0.18)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(p.x,p.y-6,48,26,0,0,Math.PI*2); ctx.stroke();
+      if(!blink) for(const d of sp.drones){
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createRadialGradient(d.x,d.y,1,d.x,d.y,14);
+        g.addColorStop(0,'rgba(155,240,188,0.7)'); g.addColorStop(1,'rgba(155,240,188,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(d.x,d.y,14,0,Math.PI*2); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.save(); ctx.translate(d.x,d.y); ctx.rotate(Math.PI/4);
+        ctx.fillStyle = ship.color; ctx.fillRect(-4,-4,8,8);
+        ctx.fillStyle = '#eafff5'; ctx.fillRect(-1.5,-1.5,3,3);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+  },
+
+  playerFire(){
+    const p = this.player;
+    const stats = this.stats;
+    const ang = -Math.PI/2;
+    this.projectiles.push(new Projectile(
+      p.x, p.y-18, Math.cos(ang)*stats.projectileSpeed, Math.sin(ang)*stats.projectileSpeed,
+      stats.damage, 4, p.color, true, stats.range
+    ));
+    audio.shoot();
+  },
+
+  enemyFire(enemy){
+    const p = this.player;
+    let ang;
+    if(enemy.def.behavior==='aim'){
+      ang = Math.atan2(p.y-enemy.y, p.x-enemy.x);
+    } else {
+      ang = Math.PI/2;
+    }
+    const spd = 260;
+    this.enemyProjectiles.push(new Projectile(enemy.x, enemy.y+10, Math.cos(ang)*spd, Math.sin(ang)*spd, enemy.damage, 3.4, '#ff6b5e', false, 2000));
+  },
+
+  // boss shots are created on demand by Boss's own attack routines (see onFireProjectile
+  // in updateBoss below) — this helper just turns one shot request into a real Projectile,
+  // with a hard cap so a busy pattern can never spawn an unbounded number of them.
+  spawnBossProjectile(p){
+    if(this.enemyProjectiles.length > 70) return;
+    const proj = new Projectile(p.x, p.y, p.vx, p.vy, p.damage, 5, '#ff4d5e', false, 2600);
+    if(p.homing){ proj.homing = p.homing; proj.homingTurnRate = p.homingTurnRate || 1.5; }
+    this.enemyProjectiles.push(proj);
+  },
+
+  loop(ts){
+    if(this.paused) return;
+    const dt = Math.min((ts-this.lastTs)/1000, 0.05);
+    this.lastTs = ts;
+    this.runElapsedMs += dt*1000;
+    this.update(dt);
+    this.render();
+    if(this.state==='travel' || this.state==='boss'){
+      this.raf = requestAnimationFrame(this.loop.bind(this));
+    }
+  },
+
+  update(dt){
+    const b = this.bounds;
+    this.bgField.update(dt, this.state==='travel'?2.4:1.3);
+    if(this.screenShake > 0) this.screenShake = Math.max(0, this.screenShake - dt*50);
+
+    this.player.update(dt, this.input, b);
+    if(this.input.firing && this.player.canFire() && this.player.alive){
+      this.playerFire(); this.player.fire();
+    }
+    this.updateSpecial(dt);
+
+    this.projectiles.forEach(pr=>pr.update(dt));
+    this.enemyProjectiles.forEach(pr=>pr.update(dt, this.player));
+    this.projectiles = this.projectiles.filter(pr=> !pr.dead && pr.y>-40 && pr.y<b.bottom+40 && pr.x>-40 && pr.x<b.right+40);
+    this.enemyProjectiles = this.enemyProjectiles.filter(pr=> !pr.dead && pr.y>-40 && pr.y<b.bottom+40);
+
+    this.particles.forEach(p=>p.update(dt));
+    this.particles = this.particles.filter(p=>!p.dead);
+
+    if(this.state==='travel') this.updateTravel(dt);
+    else if(this.state==='boss') this.updateBoss(dt);
+
+    this.handleCollisions();
+
+    // player death check
+    if(!this.player.alive){
+      this.onPlayerDeath();
+      return;
+    }
+
+    UI.updateHud(this.player, this.save.credits);
+  },
+
+  updateTravel(dt){
+    const t = this.travel;
+    t.elapsed += dt;
+    t.spawnTimer -= dt*1000;
+    t.asteroidTimer -= dt*1000;
+
+    // steeper per-tier ramp, shifted down overall so planet 1 already feels notably more
+    // active (not just the late planets), plus a simultaneous-enemy ceiling that grows
+    // with tier so higher tiers can hold more ships on screen at once.
+    const spawnInterval = Math.max(1500 - t.tier*190, 480);
+    const maxConcurrent = 5 + t.tier;
+    if(!t.ending && t.spawnTimer <= 0 && this.enemies.length < maxConcurrent){
+      t.spawnTimer = spawnInterval * rand(0.8,1.2);
+      this.spawnEnemy(this.pickEnemyType(t.tier));
+      // bursts now start from the very first planet (small chance) and scale up steadily,
+      // instead of only appearing from the mid-game onward
+      const burstChance = 0.05 + (t.tier-1)*0.085;
+      if(Math.random()<burstChance && this.enemies.length < maxConcurrent){
+        this.spawnEnemy(this.pickEnemyType(t.tier));
+      }
+    }
+    const asteroidInterval = Math.max(1600 - t.tier*90, 700);
+    if(!t.ending && t.asteroidTimer <= 0){
+      t.asteroidTimer = asteroidInterval * rand(0.8,1.3);
+      this.spawnAsteroid();
+    }
+
+    this.enemies.forEach(en=> en.update(dt, this.player, this.bounds, (e)=>this.enemyFire(e)));
+    this.asteroids.forEach(a=> a.update(dt, this.bounds));
+    this.enemies = this.enemies.filter(e=>!e.dead);
+    this.asteroids = this.asteroids.filter(a=>!a.dead);
+    audio.setIntensity(this.enemies.length > 0 ? 1 : 0);
+
+    if(t.elapsed >= t.duration && !t.ending){
+      t.ending = true;
+      UI.flashMessage(`Llegando a ${PLANETS[t.toIndex].name}…`);
+      setTimeout(()=> this.completeTravel(), 2200);
+    }
+  },
+
+  completeTravel(){
+    if(this.state !== 'travel') return;
+    const t = this.travel;
+    this.save.planetIndex = t.toIndex;
+    this.save.stats.playTimeMs += this.runElapsedMs;
+    SaveManager.save();
+    cancelAnimationFrame(this.raf);
+    audio.stopMusic();
+    UI.goToPlanet(t.toIndex);
+  },
+
+  updateBoss(dt){
+    const boss = this.boss;
+    boss.update(dt, this.player, this.bounds, {
+      onFireProjectile: (p)=> this.spawnBossProjectile(p),
+      onSpawn: (type)=> { if(this.enemies.length < 11) this.spawnEnemy(type); }, // perf cap (raised slightly so the extra reinforcements actually land)
+      onPhaseChange: (phase)=>{
+        // phase changes happen silently now — no on-screen text announces them
+        audio.bossAlert();
+        audio.setBossPhase(phase);
+      },
+      onMessage: (text)=> UI.flashMessage(text),
+      onBossAlert: ()=> audio.bossAlert(),
+      onScreenShake: (amount)=>{ this.screenShake = Math.max(this.screenShake||0, amount); },
+      onWorldBreakerTick: (dt2, safeSide)=>{
+        const b = this.bounds;
+        const laneW = (b.right-b.left)*0.28;
+        const safeMin = safeSide==='left' ? b.left+16 : b.right-laneW;
+        const safeMax = safeSide==='left' ? b.left+laneW : b.right-16;
+        const inSafe = this.player.x >= safeMin && this.player.x <= safeMax;
+        // ≈600 total over the 1.1s firing window if the player fails the safe lane — far heavier
+        // than the laser below, but still 0 damage inside the safe lane (always avoidable).
+        if(!inSafe) this.damagePlayer((600/1.1)*dt2, true);
+      },
+    });
+
+    // laser hit detection (was visual-only before): damage while the beam is actually
+    // firing, using the same ox/oy/angle the telegraph/render already track.
+    if(boss.laser && boss.laser.state === 'firing'){
+      const L = boss.laser;
+      const dirX = Math.cos(L.angle), dirY = Math.sin(L.angle);
+      const toPX = this.player.x - L.ox, toPY = this.player.y - L.oy;
+      const along = toPX*dirX + toPY*dirY;
+      if(along >= 0){
+        const closestX = L.ox + dirX*along, closestY = L.oy + dirY*along;
+        const dist = Math.hypot(this.player.x-closestX, this.player.y-closestY);
+        const fireSec = (boss.routine === 'double_laser') ? 0.45 : 0.6; // existing beam durations
+        if(dist < 16) this.damagePlayer((180/fireSec)*dt, true); // ≈180 per beam if fully exposed
+      }
+    }
+
+    this.enemies.forEach(en=> en.update(dt, this.player, this.bounds, (e)=>this.enemyFire(e)));
+    this.enemies = this.enemies.filter(e=>!e.dead);
+
+    UI.updateBossBar(boss);
+
+    if(boss.defeated && boss.deathTimer > 2600 && this.state==='boss'){
+      this.onBossDefeated();
+    }
+    if(boss.defeated && Math.random()<0.5){
+      this.spawnExplosion(boss.x + rand(-90,90), boss.y + rand(-30,30), '#ff9f4a', 6);
+    }
+  },
+
+  onBossDefeated(){
+    this.save.bossDefeated = true;
+    this.save.planetIndex = PLANETS.length-1; // Veyra
+    this.save.stats.playTimeMs += this.runElapsedMs;
+    SaveManager.save();
+    const sid = this.save.shipId;
+    const hadSecret = UnlockManager.secretAvailable(), hadShip = UnlockManager.isUnlocked(sid);
+    UnlockManager.unlock(sid); // permanent — survives "Borrar partida" and new campaigns
+    this.secretNews = (!hadSecret && UnlockManager.secretAvailable()) ? 'avail' : (sid==='eclipse' && !hadShip ? 'unlocked' : null);
+    cancelAnimationFrame(this.raf);
+    audio.stopMusic();
+    audio.victory();
+    this.startArrivalCinematic(); // the results screen appears after the ship reaches Veyra
+  },
+
+  /* ---------------- ARRIVAL AT VEYRA (short cinematic before the results screen) ---------------- */
+  _veyraSprite(){
+    if(this._veyraCv) return this._veyraCv;
+    const S = 96, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const g = cv.getContext('2d'), r = S/2-1;
+    for(let y=0;y<S;y++) for(let x=0;x<S;x++){
+      const dx = x+0.5-S/2, dy = y+0.5-S/2;
+      if(Math.sqrt(dx*dx+dy*dy) > r) continue;
+      const lit = (-dx*0.6-dy*0.5)/r;
+      const n = Math.sin(x*0.21+1.3)+Math.sin(y*0.27+0.4)+Math.sin((x+y)*0.12)+Math.sin((x-y)*0.17+2.0);
+      g.fillStyle = n>1.25
+        ? (lit>0.4?'#8fe39a': lit>0?'#4fb56e': lit>-0.4?'#2f8650':'#17503a')
+        : (lit>0.4?'#7fe6f0': lit>0?'#3fb4cf': lit>-0.4?'#2481a8':'#124a68');
+      g.fillRect(x,y,1,1);
+    }
+    this._veyraCv = cv;
+    return cv;
+  },
+  startArrivalCinematic(){
+    this.state = 'cinematic';
+    this.input.firing = false;
+    this.resetEntities();
+    document.getElementById('hud').classList.remove('active');
+    document.getElementById('touch-controls').classList.remove('active');
+    document.getElementById('hud-msg').classList.remove('show');
+    const layer = document.getElementById('cine-layer'), txt = document.getElementById('cine-text');
+    txt.classList.remove('show'); txt.textContent = '';
+    layer.classList.add('active');
+    this.cine = { t:0, dur:7000, line:0 };
+    this.cineLast = performance.now();
+    layer.onclick = ()=>{ if(this.cine && this.cine.t > 1200) this.finishCinematic(); }; // tap to skip (not instantly, so a held FIRE doesn't skip it)
+    this.cineRaf = requestAnimationFrame(this.cineLoop.bind(this));
+  },
+  cineLoop(ts){
+    const c = this.cine;
+    if(!c || this.state !== 'cinematic') return;
+    const dt = Math.min((ts-this.cineLast)/1000, 0.05); this.cineLast = ts;
+    c.t += dt*1000;
+    const k = clamp(c.t/c.dur, 0, 1);
+    this.bgField.update(dt, lerp(5, 1.2, k));   // cruising speed eases as Veyra looms
+    this.bgField.draw();
+    this.renderArrival(k, c.t);
+    const txt = document.getElementById('cine-text');
+    if(c.t > 600  && c.line === 0){ txt.textContent = 'THE WORLDBREAKER HA CAÍDO'; txt.classList.add('show'); c.line = 1; }
+    if(c.t > 3000 && c.line === 1){ txt.classList.remove('show'); c.line = 2; }
+    if(c.t > 3900 && c.line === 2){ txt.textContent = 'VEYRA · HOGAR'; txt.classList.add('show'); c.line = 3; }
+    if(c.t >= c.dur){ this.finishCinematic(); return; }
+    this.cineRaf = requestAnimationFrame(this.cineLoop.bind(this));
+  },
+  renderArrival(k, tMs){
+    const ctx = this.ctx, w = this.bounds.right, h = this.bounds.bottom;
+    ctx.clearRect(0,0,w,h);
+    const ease = k*k*(3-2*k);
+    const pr = h*(0.05+0.50*ease), pcx = w/2, pcy = h*0.30;
+    // atmosphere glow + the pixel-art planet, scaled without smoothing
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const gl = ctx.createRadialGradient(pcx,pcy,pr*0.8,pcx,pcy,pr*1.45);
+    gl.addColorStop(0,'rgba(79,216,232,0.38)'); gl.addColorStop(1,'rgba(79,216,232,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(pcx,pcy,pr*1.45,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this._veyraSprite(), pcx-pr, pcy-pr, pr*2, pr*2);
+    ctx.restore();
+    // the player's own ship (same pixel-art sprite as gameplay), flying up toward Veyra
+    const ship = SHIPS.find(s=>s.id===this.save.shipId) || SHIPS[0];
+    const sprite = PixelSprites.getHMirrored('ship:'+ship.id, SHIP_SPRITE_GRIDS[ship.id] || SHIP_SPRITE_GRIDS.vanguard, shipPalette(ship));
+    const SC = 3, dW = sprite.width*SC, dH = sprite.height*SC;
+    const sx = w/2, sy = h*(0.82-0.30*ease) + Math.sin(tMs/300)*2;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const flick = 0.8+0.2*Math.sin(tMs/70);
+    const eg = ctx.createRadialGradient(sx,sy+dH/2,1,sx,sy+dH/2,34*flick);
+    eg.addColorStop(0,'rgba(255,190,110,0.85)'); eg.addColorStop(1,'rgba(255,120,40,0)');
+    ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(sx,sy+dH/2,34*flick,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.save(); ctx.translate(sx, Math.round(sy)); PixelSprites.draw(ctx, sprite, dW, dH); ctx.restore();
+    const fade = clamp((k-0.9)/0.1, 0, 1);
+    if(fade > 0){ ctx.fillStyle = `rgba(5,8,14,${fade})`; ctx.fillRect(0,0,w,h); }
+  },
+  finishCinematic(){
+    if(this.state !== 'cinematic') return;
+    cancelAnimationFrame(this.cineRaf); this.cine = null;
+    document.getElementById('cine-layer').classList.remove('active');
+    document.getElementById('cine-text').classList.remove('show');
+    this.ctx.clearRect(0,0,this.bounds.right,this.bounds.bottom);
+    this.state = 'victory';
+    UI.showVictory(); // the existing results screen, now shown AFTER the arrival
+  },
+
+  handleCollisions(){
+    const p = this.player;
+
+    // player projectiles vs enemies / asteroids / boss
+    for(const pr of this.projectiles){
+      if(pr.dead) continue;
+      if(this.state==='boss' && this.boss && !this.boss.defeated){
+        const core = this.boss.corePos();
+        const hitCore = this.boss.coreExposed && circleHit(pr.x,pr.y,pr.radius, core.x, core.y, core.r);
+        const hitBody = circleHit(pr.x,pr.y,pr.radius, this.boss.x, this.boss.y, 120);
+        if(hitCore || hitBody){
+          // piercing special shots (pr.pierce>0) pass through, hitting each target only once
+          let skip = false;
+          if(pr.pierce > 0){
+            pr.hit = pr.hit || new Set();
+            if(pr.hit.has('boss')) skip = true; else { pr.hit.add('boss'); pr.pierce--; }
+          } else pr.dead = true;
+          if(!skip){
+            const killed = this.boss.takeDamage(pr.damage, hitCore);
+            audio.hit();
+            this.spawnExplosion(pr.x,pr.y, hitCore?'#ff4d5e':'#8a97b3', 5);
+            if(killed){ audio.explosion(true); this.spawnExplosion(this.boss.x,this.boss.y,'#ff9f4a',60); }
+          }
+          if(pr.dead) continue;
+        }
+      }
+      for(const en of this.enemies){
+        if(en.dead || (pr.hit && pr.hit.has(en))) continue;
+        if(circleHit(pr.x,pr.y,pr.radius, en.x,en.y,en.radius)){
+          if(pr.pierce > 0){ pr.hit = pr.hit || new Set(); pr.hit.add(en); pr.pierce--; } else pr.dead = true;
+          const killed = en.takeDamage(pr.damage);
+          audio.hit();
+          this.spawnExplosion(pr.x,pr.y,'#8a97b3',4);
+          if(killed){
+            this.save.credits += en.reward;
+            this.save.stats.enemiesDestroyed++;
+            audio.explosion(false);
+            this.spawnExplosion(en.x,en.y, '#ff9f4a', 16);
+          }
+          if(pr.dead) break;
+        }
+      }
+      if(pr.dead) continue;
+      for(const a of this.asteroids){
+        if(a.dead || (pr.hit && pr.hit.has(a))) continue;
+        if(circleHit(pr.x,pr.y,pr.radius, a.x,a.y,a.radius)){
+          if(pr.pierce > 0){ pr.hit = pr.hit || new Set(); pr.hit.add(a); pr.pierce--; } else pr.dead = true;
+          const killed = a.takeDamage(pr.damage);
+          audio.hit();
+          this.spawnExplosion(pr.x,pr.y,'#8a97b3',3);
+          if(killed){
+            this.save.credits += a.reward;
+            this.save.stats.asteroidsDestroyed++;
+            audio.explosion(false);
+            this.spawnExplosion(a.x,a.y,'#c9d2e8',12);
+          }
+          if(pr.dead) break;
+        }
+      }
+    }
+
+    // enemy projectiles vs player
+    for(const pr of this.enemyProjectiles){
+      if(pr.dead) continue;
+      if(circleHit(pr.x,pr.y,pr.radius, p.x,p.y,p.radius)){
+        pr.dead = true;
+        this.damagePlayer(pr.damage);
+      }
+    }
+
+    // enemies ramming player
+    for(const en of this.enemies){
+      if(en.dead || p.immune) continue;
+      if(circleHit(en.x,en.y,en.radius, p.x,p.y,p.radius)){
+        this.damagePlayer(en.damage);
+        en.dead = true;
+        this.spawnExplosion(en.x,en.y,'#ff9f4a',12);
+        audio.explosion(false);
+      }
+    }
+
+    // asteroids colliding with player
+    for(const a of this.asteroids){
+      if(a.dead || p.immune) continue;
+      if(circleHit(a.x,a.y,a.radius, p.x,p.y,p.radius)){
+        this.damagePlayer(Math.round(a.radius*0.9));
+        a.dead = true;
+        this.spawnExplosion(a.x,a.y,'#8a97b3',10);
+        audio.explosion(false);
+      }
+    }
+
+    // boss body colliding with player (rare, boss stays mostly upper screen)
+    if(this.state==='boss' && this.boss && !this.boss.defeated){
+      if(circleHit(this.boss.x,this.boss.y,110, p.x,p.y,p.radius)){
+        this.damagePlayer(18*(1/60));
+      }
+    }
+
+    this.projectiles = this.projectiles.filter(pr=>!pr.dead);
+    this.enemyProjectiles = this.enemyProjectiles.filter(pr=>!pr.dead);
+    this.enemies = this.enemies.filter(e=>!e.dead);
+    this.asteroids = this.asteroids.filter(a=>!a.dead);
+  },
+
+  damagePlayer(amount, ignoreInvuln){
+    if(this.player.immune) return; // Phase Strike: nothing can touch the ship
+    const before = this.player.shield;
+    this.player.takeDamage(amount, ignoreInvuln);
+    if(before>0) audio.shieldHit();
+    if(this.player.health < this.player.stats.maxHealth) audio.damage();
+  },
+
+  onPlayerDeath(){
+    cancelAnimationFrame(this.raf);
+    audio.stopMusic();
+    audio.gameover();
+    this.save.stats.playTimeMs += this.runElapsedMs;
+    SaveManager.save();
+    this.state = 'gameover';
+    UI.showGameOver();
+  },
+
+  retryEncounter(){
+    if(this.mode === 'boss'){
+      this.startBoss();
+    } else if(this.travel){
+      this.startTravel(this.travel.fromIndex, this.travel.toIndex);
+    }
+  },
+
+  render(){
+    const ctx = this.ctx;
+    ctx.clearRect(0,0,this.bounds.right,this.bounds.bottom);
+    const shaking = this.screenShake > 0;
+    if(shaking){
+      ctx.save();
+      ctx.translate((Math.random()-0.5)*this.screenShake, (Math.random()-0.5)*this.screenShake);
+    }
+    this.bgField.draw();
+
+    this.asteroids.forEach(a=>a.draw(ctx));
+    this.enemies.forEach(e=>e.draw(ctx));
+    if(this.state==='boss' && this.boss){
+      this.boss.draw(ctx);
+      this.renderBossHazards(ctx);
+    }
+    this.projectiles.forEach(p=>p.draw(ctx));
+    this.enemyProjectiles.forEach(p=>p.draw(ctx));
+    if(this.player.alive) this.player.draw(ctx);
+    this.renderSpecial(ctx);
+    this.particles.forEach(p=>p.draw(ctx));
+    if(shaking) ctx.restore();
+  },
+
+  // telegraphs and hazards for the boss's laser and WORLD BREAKER attacks (purely visual
+  // except where noted — the actual damage checks live in updateBoss's onWorldBreakerTick)
+  renderBossHazards(ctx){
+    const boss = this.boss;
+    if(!boss) return;
+
+    if(boss.laser){
+      const L = boss.laser;
+      const len = 900;
+      const x2 = L.ox + Math.cos(L.angle)*len;
+      const y2 = L.oy + Math.sin(L.angle)*len;
+      ctx.save();
+      if(L.state === 'warn'){
+        const pulse = 0.35 + 0.35*Math.abs(Math.sin(L.timer/90));
+        ctx.strokeStyle = `rgba(255,77,94,${pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10,8]);
+        ctx.beginPath(); ctx.moveTo(L.ox,L.oy); ctx.lineTo(x2,y2); ctx.stroke();
+        ctx.setLineDash([]);
+      } else if(L.state === 'firing'){
+        ctx.strokeStyle = 'rgba(255,77,94,0.55)';
+        ctx.lineWidth = 26;
+        ctx.beginPath(); ctx.moveTo(L.ox,L.oy); ctx.lineTo(x2,y2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,235,200,0.95)';
+        ctx.lineWidth = 10;
+        ctx.shadowColor = '#ff4d5e'; ctx.shadowBlur = 18;
+        ctx.beginPath(); ctx.moveTo(L.ox,L.oy); ctx.lineTo(x2,y2); ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+    }
+
+    const wb = boss.worldBreaker;
+    if(wb && wb.state !== 'idle'){
+      const b = this.bounds;
+      const laneW = (b.right-b.left)*0.28;
+      const safeMin = wb.safeSide==='left' ? b.left+16 : b.right-laneW;
+      const safeMax = wb.safeSide==='left' ? b.left+laneW : b.right-16;
+      ctx.save();
+      if(wb.state === 'charging'){
+        const prog = clamp(wb.timer/3200, 0, 1);
+        ctx.fillStyle = `rgba(180,20,30,${0.05+0.22*prog})`;
+        ctx.fillRect(b.left,b.top,b.right-b.left,b.bottom-b.top);
+        ctx.fillStyle = `rgba(120,255,220,${0.10+0.20*prog})`;
+        ctx.fillRect(safeMin,b.top,safeMax-safeMin,b.bottom-b.top);
+        ctx.strokeStyle = `rgba(120,255,220,${0.4+0.5*prog})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(safeMin,b.top,safeMax-safeMin,b.bottom-b.top);
+      } else if(wb.state === 'firing'){
+        ctx.fillStyle = 'rgba(200,30,40,0.4)';
+        ctx.fillRect(b.left,b.top,b.right-b.left,b.bottom-b.top);
+        ctx.fillStyle = 'rgba(150,255,230,0.18)';
+        ctx.fillRect(safeMin,b.top,safeMax-safeMin,b.bottom-b.top);
+      }
+      ctx.restore();
+    }
+  },
+};
+/* =========================================================================
+   UI CONTROLLER — DOM screens + HUD glue
+   ========================================================================= */
+const INTRO_LINES = [
+  "En los confines de la galaxia, diez mundos se preparan para desaparecer.",
+  "Una supernave conocida como THE WORLDBREAKER ha comenzado a borrar planetas del mapa estelar.",
+  "Su próximo objetivo es Veyra, un pequeño mundo que el protagonista llama hogar.",
+  "Durante años, nadie conoció la verdadera debilidad de la Worldbreaker.",
+  "Hasta ahora.",
+  "Antes de morir, un antiguo ingeniero entregó a su hijo los planos secretos de la nave que ayudó a construir.",
+  "Esos planos contienen una información que podría cambiar el destino de la galaxia.",
+  "Pero solo existe un piloto capaz de llegar hasta ella.",
+  "Y el tiempo se está acabando.",
+];
+
+const UI = {
+  selectedShipId: SHIPS[0].id,
+  activeTab: 'upgrades',
+  currentPlanetIndex: 0,
+
+  init(){
+    this.cacheEls();
+    this.bindEvents();
+    this.loadAudioSliders();
+  },
+
+  cacheEls(){
+    this.screens = {};
+    document.querySelectorAll('.screen').forEach(el=> this.screens[el.id]=el);
+  },
+
+  showScreen(id){
+    Object.values(this.screens).forEach(s=>s.classList.remove('active'));
+    if(this.screens[id]) this.screens[id].classList.add('active');
+    // 'screen-options' and 'screen-pause' don't overwrite the underlying gameplay/menu state
+    // so we know where to return to (see options-back handling below).
+    const stateMap = {'screen-menu':'menu','screen-hangar':'hangar','screen-planet':'planet','screen-intro':'intro'};
+    if(stateMap[id]) Game.state = stateMap[id];
+    else if(id==='screen-pause') Game.state = 'pause';
+    document.getElementById('hud').classList.remove('active');
+    document.getElementById('touch-controls').classList.remove('active');
+    this.checkOrientation();
+  },
+
+  hideOverlays(){
+    ['screen-pause','screen-gameover','screen-victory'].forEach(id=>this.screens[id].classList.remove('active'));
+  },
+
+  /* ---------------- INTRO ---------------- */
+  showIntro(){
+    this.showScreen('screen-intro');
+    const lineEl = document.getElementById('intro-line');
+    const logoEl = document.getElementById('intro-logo');
+    const beginEl = document.getElementById('intro-begin');
+    const continueEl = document.getElementById('intro-continue');
+    const wrapEl = document.getElementById('intro-text-wrap');
+    const screenEl = document.getElementById('screen-intro');
+    let i = 0;
+    let cancelled = false;
+    let canAdvance = false; // small grace period per line so a stray tap can't skip two at once
+    let graceTimer = null;
+
+    this._introCancel = ()=>{
+      cancelled = true;
+      if(graceTimer) clearTimeout(graceTimer);
+    };
+
+    const showLogo = ()=>{
+      canAdvance = false;
+      lineEl.classList.remove('show');
+      continueEl.classList.remove('show');
+      setTimeout(()=>{
+        wrapEl.style.display = 'none';
+        logoEl.classList.add('show');
+        setTimeout(()=> beginEl.classList.add('show'), 900);
+      }, 500);
+    };
+
+    const showLine = ()=>{
+      if(cancelled) return;
+      if(i >= INTRO_LINES.length){ showLogo(); return; }
+      canAdvance = false;
+      continueEl.classList.remove('show');
+      lineEl.textContent = INTRO_LINES[i];
+      lineEl.classList.add('show');
+      i++;
+      // the line stays on screen until the player advances it themselves; this timer only
+      // controls how soon the "tap to continue" hint appears (and advancing is allowed),
+      // so nobody feels rushed reading a longer sentence
+      graceTimer = setTimeout(()=>{
+        if(cancelled) return;
+        canAdvance = true;
+        continueEl.classList.add('show');
+      }, 900);
+    };
+
+    const advance = ()=>{
+      if(cancelled || !canAdvance) return;
+      canAdvance = false;
+      continueEl.classList.remove('show');
+      lineEl.classList.remove('show');
+      setTimeout(()=>{ if(!cancelled) showLine(); }, 380);
+    };
+    this._introAdvance = advance;
+
+    wrapEl.style.display = 'flex';
+    logoEl.classList.remove('show'); beginEl.classList.remove('show'); continueEl.classList.remove('show');
+    setTimeout(showLine, 500);
+
+    // click/tap anywhere on the intro (except the skip label) advances to the next line
+    screenEl.onclick = (e)=>{
+      if(e.target.closest('#intro-skip') || e.target.closest('#intro-begin')) return;
+      advance();
+    };
+    // keyboard: Space/Enter also advances, while the intro is on screen
+    this._introKeyHandler = (e)=>{
+      if(Game.state !== 'intro') return;
+      if(e.code === 'Space' || e.code === 'Enter'){
+        e.preventDefault();
+        advance();
+      }
+    };
+    window.addEventListener('keydown', this._introKeyHandler);
+
+    document.getElementById('intro-skip').onclick = (e)=>{
+      e.stopPropagation();
+      this._introCancel && this._introCancel();
+      wrapEl.style.display = 'none';
+      logoEl.classList.add('show'); beginEl.classList.add('show');
+    };
+  },
+
+  /* ---------------- MENU ---------------- */
+  showMenu(){
+    audio.unlock();
+    audio.startMusic('menu');
+    HangarViewer.stop(); // safety net: never leave the rotation loop running off-screen
+    // Re-sync Game's save reference straight from localStorage every time the menu is
+    // shown, so a stale in-memory object can never linger here after a reset.
+    Game.save = SaveManager.load();
+    document.getElementById('btn-continuar').disabled = !SaveManager.hasSavedGame();
+    this.showScreen('screen-menu');
+  },
+
+  /* ---------------- HANGAR ---------------- */
+  // Brief controls screen after EMBARCAR: shows the REAL controls for this device and ship.
+  showControls(){
+    const s = SHIPS.find(x=>x.id===this.selectedShipId) || SHIPS[0];
+    const sp = SPECIALS[s.id] || {name:'SPECIAL', desc:'', cooldown:0};
+    const touch = !!Game.isTouch;
+    const key = (t)=>`<span class="ctl-key">${t}</span>`;
+    const rows = touch ? [
+      ['MOVIMIENTO', key('JOYSTICK')+`<div class="ctl-note">Arrastra el joystick virtual de la parte inferior izquierda.</div>`],
+      ['DISPARO NORMAL', key('FUEGO')+`<div class="ctl-note">Mantén pulsado el botón FUEGO (abajo a la derecha).</div>`],
+      ['ESPECIAL', key('SPECIAL')+`<div class="ctl-note"><b style="color:${s.color}">${sp.name}</b> — ${sp.desc} Botón SPECIAL sobre FUEGO; se rellena mientras recarga (${sp.cooldown} s).</div>`],
+      ['PAUSA', key('⏸')+`<div class="ctl-note">Botón de pausa, arriba a la derecha.</div>`],
+    ] : [
+      ['MOVIMIENTO', key('W')+key('A')+key('S')+key('D')+`<span style="color:var(--text-faint);font-size:12px;">o</span>`+key('←')+key('↑')+key('↓')+key('→')],
+      ['DISPARO NORMAL', key('ESPACIO')+`<div class="ctl-note">Mantén pulsada la barra espaciadora.</div>`],
+      ['ESPECIAL', key('E')+`<div class="ctl-note"><b style="color:${s.color}">${sp.name}</b> — ${sp.desc} Recarga: ${sp.cooldown} s (barra bajo escudo).</div>`],
+      ['PAUSA', key('ESC')],
+    ];
+    document.getElementById('ctl-title').textContent = 'Controles · ' + s.name;
+    document.getElementById('ctl-title').style.color = s.color;
+    document.getElementById('ctl-sub').textContent = touch ? 'Controles táctiles de este dispositivo.' : 'Controles de teclado.';
+    document.getElementById('ctl-list').innerHTML = rows.map(([label,html])=>
+      `<div class="ctl-row"><div class="ctl-label">${label}</div><div class="ctl-keys">${html}</div></div>`).join('');
+    this.showScreen('screen-controls');
+  },
+  // mode: 'select' (from JUGAR — pick a ship and start a new campaign) or
+  // 'gallery' (from HANGAR — browse-only, never touches Game.save/starts a campaign)
+  showHangar(mode){
+    this.hangarMode = (mode === 'gallery') ? 'gallery' : 'select';
+    if(this.hangarMode === 'select'){
+      const cur = SHIPS.find(x=>x.id===this.selectedShipId);
+      if(!cur || (cur.secret && !UnlockManager.secretAvailable())) this.selectedShipId = SHIPS[0].id;
+    }
+    audio.startMusic('menu');
+    this.showScreen('screen-hangar');
+    const gallery = this.hangarMode === 'gallery';
+    document.getElementById('hangar-title').textContent = gallery ? 'Hangar' : 'Selecciona tu nave';
+    document.getElementById('hangar-subtitle').textContent = gallery
+      ? 'Galería de naves. Las bloqueadas se desbloquean completando el juego con ellas.'
+      : 'Cada nave ofrece un estilo de combate distinto. Elige la que se adapte a tu forma de pilotar.';
+    document.getElementById('hangar-launch-row').style.display = gallery ? 'none' : '';
+    this.renderShipList();
+    this.renderShipDetail();
+  },
+  renderShipList(){
+    const gallery = this.hangarMode === 'gallery';
+    const el = document.getElementById('ship-list');
+    const list = gallery ? SHIPS : SHIPS.filter(s=>!s.secret || UnlockManager.secretAvailable());
+    el.innerHTML = list.map(s=>{
+      const locked = gallery && !UnlockManager.isUnlocked(s.id);
+      const hidden = locked && s.secret && !UnlockManager.secretAvailable(); // still a mystery
+      return `
+      <div class="ship-card ${s.id===this.selectedShipId?'selected':''}" data-ship="${s.id}">
+        <canvas width="46" height="46" class="ship-glyph" data-icon="${s.id}" style="${hidden?'opacity:.35;filter:grayscale(1) brightness(.2);':locked?'opacity:.35;filter:grayscale(1);':''}"></canvas>
+        <div>
+          <div class="ship-name" style="color:${locked?'var(--text-faint)':s.color}">${hidden?'???':s.name}${locked?' 🔒':''}</div>
+          <div class="ship-tag">${hidden?'Nave secreta':locked?'Bloqueada':s.tag}</div>
+        </div>
+      </div>
+    `;}).join('');
+    el.querySelectorAll('canvas[data-icon]').forEach(cv=> drawShipIcon(cv, cv.dataset.icon));
+    el.querySelectorAll('.ship-card').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        this.selectedShipId = card.dataset.ship;
+        audio.select();
+        this.renderShipList();
+        this.renderShipDetail();
+      });
+    });
+  },
+  renderShipDetail(){
+    HangarViewer.stop();
+    const gallery = this.hangarMode === 'gallery';
+    const s = SHIPS.find(x=>x.id===this.selectedShipId);
+    const locked = gallery && !UnlockManager.isUnlocked(s.id);
+    const panel = document.getElementById('ship-detail');
+
+    if(locked){
+      panel.innerHTML = `
+        <div style="text-align:center; padding:26px 10px;">
+          <div style="font-size:36px; margin-bottom:12px;">🔒</div>
+          <div class="ship-detail-name" style="color:var(--text-dim);">${(s.secret && !UnlockManager.secretAvailable()) ? '???' : s.name}</div>
+          <p class="lead" style="margin-top:10px;">${!s.secret ? `Nave bloqueada. Se desbloquea al completar el juego pilotando ${s.name}.`
+            : UnlockManager.secretAvailable() ? 'Nave secreta ya disponible en NUEVA PARTIDA. Complétala pilotándola para desbloquearla en el Hangar.'
+            : 'Nave secreta. Completa el juego con las cinco naves para poder pilotarla.'}</p>
+        </div>
+      `;
+      return;
+    }
+
+    const stats = [
+      ['Vida', s.maxHealth], ['Escudo', s.maxShield], ['Velocidad', s.moveSpeed],
+      ['Cadencia', s.fireRate], ['Daño', s.damage], ['Alcance', s.range],
+    ];
+    const maxVal = 160;
+    // Select mode (JUGAR) uses the small per-card icon already shown in the list next to
+    // each ship's name — no big centered ship here. Gallery mode (Hangar) keeps its large
+    // rotating pixel-art preview, unchanged.
+    panel.innerHTML = `
+      <div class="sd-grid">
+        <div class="sd-ship">
+          ${gallery
+            ? `<canvas id="hangar-viewer-canvas" width="320" height="200" style="position:static;width:100%;height:auto;max-width:300px;display:block;margin:0 auto 4px;cursor:grab;touch-action:none;"></canvas>
+               <div class="sd-hint">ARRASTRA PARA GIRAR</div>`
+            : `<canvas id="sd-static" width="122" height="122"></canvas>`}
+          <div class="ship-detail-name" style="color:${s.color}">${s.name}</div>
+          <div class="sd-handling">MANEJO: ${s.handling.toUpperCase()}</div>
+        </div>
+        <div class="sd-info">
+          <p class="lead" style="margin-bottom:8px;">${s.desc}</p>
+          <div class="ship-detail-special">★ ${s.special}</div>
+          ${gallery ? `<p class="lead" style="margin-top:6px;margin-bottom:10px;font-style:italic;">${s.lore||''}</p>` : ''}
+          ${stats.map(([label,val])=>`
+            <div class="statbar-row">
+              <div class="statbar-label">${label}</div>
+              <div class="statbar-track"><div class="statbar-fill" style="width:${clamp(val/maxVal*100,4,100)}%"></div></div>
+              <div class="statbar-val">${val}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    if(gallery){
+      const canvas = document.getElementById('hangar-viewer-canvas');
+      if(canvas) HangarViewer.start(canvas, s.id);
+    } else {
+      drawShipIcon(document.getElementById('sd-static'), s.id); // same pixel-art sprite as gameplay
+    }
+  },
+
+  /* ---------------- PLANET / LANDING ---------------- */
+  goToPlanet(index){
+    this.currentPlanetIndex = index;
+    Game.save.planetIndex = index;
+    SaveManager.save();
+    audio.startMusic('menu');
+    this.showScreen('screen-planet');
+    this.renderPlanet(index);
+  },
+  renderPlanet(index){
+    const planet = PLANETS[index];
+    document.getElementById('planet-eyebrow').textContent = index===PLANETS.length-1 ? 'PLANETA NATAL' : `PLANETA ${index+1} / ${PLANETS.length}`;
+    document.getElementById('planet-name').textContent = planet.name;
+    document.getElementById('planet-desc').textContent = planet.desc;
+    document.getElementById('hud-credits-planet').textContent = `${Game.save.credits} CR`;
+    this.renderPlanetProgress(index);
+    this.renderPlanetHero(planet);
+    this.activeTab = 'upgrades';
+    this.renderTabs(index);
+
+    const departBtn = document.getElementById('btn-depart');
+    if(index === PLANETS.length-1){
+      departBtn.style.display = 'none';
+    } else {
+      departBtn.style.display = '';
+      departBtn.textContent = index===PLANETS.length-2 ? 'ENFRENTAR AL WORLDBREAKER ▸' : 'PARTIR ▸';
+    }
+  },
+  renderPlanetProgress(index){
+    const el = document.getElementById('planet-progress');
+    el.innerHTML = PLANETS.map((p,i)=>{
+      let cls='pp-dot';
+      if(i<index) cls+=' done'; else if(i===index) cls+=' current';
+      return `<div class="${cls}"></div>`;
+    }).join('');
+  },
+  renderPlanetHero(planet){
+    const canvas = document.getElementById('planet-hero-canvas');
+    const dpr = Math.min(window.devicePixelRatio||1,2);
+    const w = canvas.parentElement.clientWidth, h = canvas.parentElement.clientHeight;
+    canvas.width = w*dpr; canvas.height = h*dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    const g = ctx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0, planet.accent);
+    g.addColorStop(1, '#070a12');
+    ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+    // stars
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    for(let i=0;i<40;i++) ctx.fillRect(Math.random()*w, Math.random()*h*0.7, 1.4,1.4);
+    // planet sphere
+    const cx = w*0.78, cy = h*0.62, r = h*0.62;
+    const pg = ctx.createRadialGradient(cx-r*0.3, cy-r*0.3, r*0.1, cx, cy, r);
+    pg.addColorStop(0, planet.color);
+    pg.addColorStop(1, '#0b0f1c');
+    ctx.fillStyle = pg;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(7,10,18,.5)';
+    ctx.beginPath(); ctx.arc(cx+r*0.15,cy-r*0.1,r*1.02,0,Math.PI*2); ctx.fill();
+  },
+  renderTabs(index){
+    document.querySelectorAll('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===this.activeTab));
+    document.getElementById('tab-upgrades').style.display = this.activeTab==='upgrades' ? '' : 'none';
+    document.getElementById('tab-info').style.display = this.activeTab==='info' ? '' : 'none';
+    this.renderUpgrades();
+    this.renderShipInfo();
+  },
+  renderUpgrades(){
+    const el = document.getElementById('tab-upgrades');
+    const save = Game.save;
+    el.innerHTML = UPGRADE_DEFS.map(def=>{
+      const lvl = save.upgrades[def.key];
+      const maxed = lvl >= MAX_UPGRADE_LEVEL;
+      const cost = maxed ? null : upgradeCost(lvl);
+      const canAfford = !maxed && save.credits >= cost;
+      return `
+        <div class="upgrade-row">
+          <div class="upg-icon">${upgradeIconSvg(def.icon)}</div>
+          <div class="upg-info">
+            <div class="upg-name">${def.name}</div>
+            <div class="upg-lvl">${def.desc} · Nivel ${lvl}${maxed?' (MÁX)':' → '+(lvl+1)}</div>
+          </div>
+          <div class="upg-cost ${canAfford?'afford':''}">${maxed?'MÁX':cost+' CR'}</div>
+          <button class="btn small ${canAfford?'primary':''}" data-upgrade="${def.key}" ${maxed||!canAfford?'disabled':''}>COMPRAR</button>
+        </div>
+      `;
+    }).join('');
+    el.querySelectorAll('button[data-upgrade]').forEach(btn=>{
+      btn.addEventListener('click', ()=> this.buyUpgrade(btn.dataset.upgrade));
+    });
+  },
+  renderShipInfo(){
+    const el = document.getElementById('tab-info');
+    const s = SHIPS.find(x=>x.id===Game.save.shipId);
+    const st = computePlayerStats(Game.save);
+    el.innerHTML = `
+      <div class="panel">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
+          <div style="width:48px;height:48px;">${shipGlyphSvg(s,48)}</div>
+          <div>
+            <div class="ship-detail-name" style="font-size:19px;color:${s.color}">${s.name}</div>
+            <div class="ship-tag">${s.tag}</div>
+          </div>
+        </div>
+        <div class="statbar-row"><div class="statbar-label">Vida máx.</div><div class="statbar-val" style="width:auto;">${st.maxHealth}</div></div>
+        <div class="statbar-row"><div class="statbar-label">Escudo máx.</div><div class="statbar-val" style="width:auto;">${st.maxShield}</div></div>
+        <div class="statbar-row"><div class="statbar-label">Daño/disparo</div><div class="statbar-val" style="width:auto;">${st.damage}</div></div>
+        <div class="statbar-row"><div class="statbar-label">Cadencia</div><div class="statbar-val" style="width:auto;">${Math.round(1000/st.fireCooldown*100)/100}/s</div></div>
+        <div class="statbar-row"><div class="statbar-label">Créditos</div><div class="statbar-val" style="width:auto;color:var(--amber);">${Game.save.credits}</div></div>
+      </div>
+    `;
+  },
+  buyUpgrade(key){
+    const save = Game.save;
+    const lvl = save.upgrades[key];
+    if(lvl >= MAX_UPGRADE_LEVEL) return;
+    const cost = upgradeCost(lvl);
+    if(save.credits < cost) return;
+    save.credits -= cost;
+    save.upgrades[key] = lvl+1;
+    SaveManager.save();
+    audio.purchase();
+    setTimeout(()=>audio.upgrade(), 90);
+    document.getElementById('hud-credits-planet').textContent = `${save.credits} CR`;
+    this.renderUpgrades();
+    this.renderShipInfo();
+  },
+
+  /* ---------------- OPTIONS ---------------- */
+  showOptions(fromPause){
+    this._returnToPause = !!fromPause;
+    if(!fromPause) audio.startMusic('menu'); // options opened from the front-end screens keeps the menu theme going
+    Object.values(this.screens).forEach(s=>s.classList.remove('active'));
+    this.screens['screen-options'].classList.add('active');
+    this.loadAudioSliders();
+    // always start on a fresh, non-confirming state for the delete-save button
+    document.getElementById('reset-save-confirm').style.display = 'none';
+    document.getElementById('reset-save-normal').style.display = '';
+  },
+  loadAudioSliders(){
+    const save = SaveManager.load();
+    document.getElementById('vol-master').value = save.audio.master;
+    document.getElementById('vol-music').value = save.audio.music;
+    document.getElementById('vol-sfx').value = save.audio.sfx;
+    const muteMusicBtn = document.getElementById('btn-mute-music');
+    const muteSfxBtn = document.getElementById('btn-mute-sfx');
+    if(muteMusicBtn) muteMusicBtn.classList.toggle('active', !!save.audio.muteMusic);
+    if(muteMusicBtn) muteMusicBtn.textContent = save.audio.muteMusic ? 'MÚSICA SILENCIADA' : 'SILENCIAR MÚSICA';
+    if(muteSfxBtn) muteSfxBtn.classList.toggle('active', !!save.audio.muteSfx);
+    if(muteSfxBtn) muteSfxBtn.textContent = save.audio.muteSfx ? 'SFX SILENCIADOS' : 'SILENCIAR SFX';
+  },
+
+  /* ---------------- gameplay HUD ---------------- */
+  enterGameplay(label, isBoss){
+    document.getElementById('hud').classList.add('active');
+    document.getElementById('touch-controls').classList.toggle('active', !!Game.isTouch);
+    document.getElementById('hud-planet-label').textContent = isBoss ? 'COMBATE FINAL' : `RUMBO A ${label.toUpperCase()}`;
+    document.getElementById('boss-bar-wrap').classList.toggle('active', !!isBoss);
+    Object.values(this.screens).forEach(s=>s.classList.remove('active'));
+    Game.state = isBoss ? 'boss' : 'travel';
+    document.getElementById('hud-msg').classList.remove('show');
+    this.checkOrientation();
+  },
+  updateHud(player, credits){
+    document.getElementById('bar-hp').style.width = clamp(player.health/player.stats.maxHealth*100,0,100)+'%';
+    document.getElementById('bar-sh').style.width = clamp(player.shield/player.stats.maxShield*100,0,100)+'%';
+    document.getElementById('hud-credits').textContent = `${credits} CR`;
+    this.updateSpecialHud(player);
+  },
+  // cooldown readout: HUD bar (all devices) + the SPECIAL touch button fills like a clock
+  updateSpecialHud(p){
+    const def = SPECIALS[p.stats.ship.id]; if(!def) return;
+    const box = document.getElementById('hud-special');
+    const active = !!p.sp, ready = !active && p.specialCd <= 0;
+    const frac = active ? 1 : 1 - p.specialCd/p.specialMax;
+    const secs = Math.ceil(p.specialCd/1000);
+    document.getElementById('hs-name').textContent = def.name;
+    document.getElementById('hs-state').textContent = active ? 'ACTIVO' : ready ? (Game.isTouch ? 'LISTO' : 'LISTO [E]') : secs+'s';
+    document.getElementById('hs-fill').style.width = (frac*100).toFixed(1)+'%';
+    box.classList.toggle('ready', ready); box.classList.toggle('active', active);
+    const btn = document.getElementById('tc-special-btn');
+    btn.classList.toggle('ready', ready); btn.classList.toggle('active', active);
+    btn.classList.toggle('cooling', !ready && !active);
+    btn.textContent = active ? '¡YA!' : ready ? 'SPECIAL' : secs;
+    btn.style.background = (!ready && !active)
+      ? `conic-gradient(rgba(79,216,232,.38) ${(frac*100).toFixed(1)}%, rgba(10,16,28,.72) 0)` : '';
+  },
+  updateBossBar(boss){
+    document.getElementById('boss-bar-fill').style.width = clamp(boss.health/boss.maxHealth*100,0,100)+'%';
+  },
+  setBossPhase(phase){
+    document.getElementById('boss-phase-label').textContent = `FASE ${phase}${phase===3?' · NÚCLEO EXPUESTO':''}`;
+  },
+  flashMessage(text){
+    const el = document.getElementById('hud-msg');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(this._msgTimer);
+    this._msgTimer = setTimeout(()=> el.classList.remove('show'), 2000);
+  },
+
+  /* ---------------- overlays ---------------- */
+  showGameOver(){
+    const s = Game.save.stats;
+    document.getElementById('gameover-stats').innerHTML = `
+      <div class="mini-stat"><div class="mini-stat-label">CRÉDITOS</div><div class="mini-stat-val">${Game.save.credits}</div></div>
+      <div class="mini-stat"><div class="mini-stat-label">ENEMIGOS DESTRUIDOS</div><div class="mini-stat-val">${s.enemiesDestroyed}</div></div>
+    `;
+    Object.values(this.screens).forEach(sc=>sc.classList.remove('active'));
+    this.screens['screen-gameover'].classList.add('active');
+  },
+  showVictory(){
+    const s = Game.save.stats;
+    document.getElementById('victory-stats').innerHTML = `
+      <div class="mini-stat"><div class="mini-stat-label">PLANETA ALCANZADO</div><div class="mini-stat-val">${PLANETS[PLANETS.length-1].name}</div></div>
+      <div class="mini-stat"><div class="mini-stat-label">NAVE UTILIZADA</div><div class="mini-stat-val">${SHIPS.find(x=>x.id===Game.save.shipId).name}</div></div>
+      <div class="mini-stat"><div class="mini-stat-label">ENEMIGOS DESTRUIDOS</div><div class="mini-stat-val">${s.enemiesDestroyed}</div></div>
+      <div class="mini-stat"><div class="mini-stat-label">ASTEROIDES DESTRUIDOS</div><div class="mini-stat-val">${s.asteroidsDestroyed}</div></div>
+      <div class="mini-stat"><div class="mini-stat-label">CRÉDITOS OBTENIDOS</div><div class="mini-stat-val">${Game.save.credits}</div></div>
+      <div class="mini-stat"><div class="mini-stat-label">TIEMPO DE PARTIDA</div><div class="mini-stat-val">${fmtTime(s.playTimeMs)}</div></div>
+      ${Game.secretNews ? `<div class="mini-stat" style="grid-column:1/-1"><div class="mini-stat-label" style="color:var(--amber)">★ NAVE SECRETA</div><div class="mini-stat-val" style="color:var(--amber)">${Game.secretNews==='avail' ? 'ECLIPSE ya disponible en NUEVA PARTIDA' : 'ECLIPSE desbloqueada en el Hangar'}</div></div>` : ''}
+    `;
+    Object.values(this.screens).forEach(sc=>sc.classList.remove('active'));
+    this.screens['screen-victory'].classList.add('active');
+  },
+
+  /* ---------------- orientation hint ---------------- */
+  checkOrientation(){ /* the "rotate your device" banner was removed; kept as a no-op for existing callers */ },
+
+  /* ---------------- events ---------------- */
+  bindEvents(){
+    document.getElementById('btn-begin').addEventListener('click', ()=>{
+      audio.unlock(); audio.click();
+      this.showMenu();
+    });
+
+    document.getElementById('btn-jugar').addEventListener('click', ()=>{
+      if(SaveManager.hasSavedGame()){
+        const ok = confirm('Ya existe una partida guardada. Empezar una nueva partida borrará tu progreso actual. ¿Continuar?');
+        if(!ok) return;
+      }
+      audio.select();
+      this.showHangar('select');
+    });
+    document.getElementById('btn-continuar').addEventListener('click', ()=>{
+      audio.select();
+      Game.continueCampaign();
+    });
+    document.getElementById('btn-hangar-menu').addEventListener('click', ()=>{
+      // gallery mode only browses ships — it never starts or overwrites a campaign,
+      // so there is nothing to warn about here.
+      audio.select();
+      this.showHangar('gallery');
+    });
+    document.getElementById('btn-opciones').addEventListener('click', ()=>{
+      audio.select(); this.showOptions();
+    });
+
+    document.getElementById('hangar-back').addEventListener('click', ()=>{ audio.click(); HangarViewer.stop(); this.showMenu(); });
+    document.getElementById('btn-launch-campaign').addEventListener('click', ()=>{
+      audio.select();
+      HangarViewer.stop();
+      this.showControls();
+    });
+    document.getElementById('btn-controls-back').addEventListener('click', ()=>{ audio.click(); this.showHangar('select'); });
+    document.getElementById('btn-controls-start').addEventListener('click', ()=>{
+      audio.select();
+      Game.beginNewCampaign(this.selectedShipId);
+    });
+
+    document.getElementById('planet-menu-link').addEventListener('click', ()=>{ audio.click(); this.showMenu(); });
+    document.querySelectorAll('.tab-btn').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        audio.click();
+        this.activeTab = b.dataset.tab;
+        this.renderTabs(this.currentPlanetIndex);
+      });
+    });
+    document.getElementById('btn-depart').addEventListener('click', ()=>{
+      audio.select();
+      Game.departFromPlanet();
+    });
+
+    document.getElementById('options-back').addEventListener('click', ()=>{
+      audio.click();
+      if(this._returnToPause){ this._returnToPause=false; this.showScreen('screen-pause'); }
+      else this.showMenu();
+    });
+    ['master','music','sfx'].forEach(k=>{
+      document.getElementById('vol-'+k).addEventListener('input', (e)=>{
+        const save = SaveManager.load();
+        save.audio[k] = parseInt(e.target.value,10);
+        SaveManager.saveAudioOnly(save.audio);
+        audio.setPrefs(save.audio);
+      });
+    });
+    document.getElementById('btn-mute-music').addEventListener('click', ()=>{
+      const save = SaveManager.load();
+      save.audio.muteMusic = !save.audio.muteMusic;
+      SaveManager.saveAudioOnly(save.audio);
+      audio.setPrefs(save.audio);
+      this.loadAudioSliders();
+      audio.click();
+    });
+    document.getElementById('btn-mute-sfx').addEventListener('click', ()=>{
+      const save = SaveManager.load();
+      save.audio.muteSfx = !save.audio.muteSfx;
+      SaveManager.saveAudioOnly(save.audio);
+      audio.setPrefs(save.audio);
+      this.loadAudioSliders();
+      if(!save.audio.muteSfx) audio.click();
+    });
+    // In-page confirmation instead of window.confirm() — native dialogs can be blocked
+    // or silently no-op in sandboxed/embedded browser contexts, which would make this
+    // button appear to "do nothing" even though the underlying reset logic is correct.
+    document.getElementById('btn-reset-save').addEventListener('click', ()=>{
+      audio.click();
+      document.getElementById('reset-save-normal').style.display = 'none';
+      document.getElementById('reset-save-confirm').style.display = '';
+    });
+    document.getElementById('btn-reset-save-cancel').addEventListener('click', ()=>{
+      audio.click();
+      document.getElementById('reset-save-confirm').style.display = 'none';
+      document.getElementById('reset-save-normal').style.display = '';
+    });
+    document.getElementById('btn-reset-save-yes').addEventListener('click', ()=>{
+      SaveManager.reset();
+      audio.click();
+      document.getElementById('reset-save-confirm').style.display = 'none';
+      document.getElementById('reset-save-normal').style.display = '';
+      this.showMenu();
+    });
+
+    document.getElementById('btn-resume').addEventListener('click', ()=>{ audio.click(); Game.togglePause(); });
+    document.getElementById('btn-pause-options').addEventListener('click', ()=>{ audio.click(); this.showOptions(true); });
+    document.getElementById('btn-pause-menu').addEventListener('click', ()=>{
+      audio.click();
+      cancelAnimationFrame(Game.raf);
+      audio.stopMusic();
+      Game.paused = false;
+      this.showMenu();
+    });
+
+    document.getElementById('btn-retry').addEventListener('click', ()=>{
+      audio.select();
+      Object.values(this.screens).forEach(s=>s.classList.remove('active'));
+      Game.retryEncounter();
+    });
+    document.getElementById('btn-gameover-menu').addEventListener('click', ()=>{
+      audio.click();
+      this.showMenu();
+    });
+
+    document.getElementById('btn-play-again').addEventListener('click', ()=>{
+      audio.select();
+      SaveManager.reset();
+      this.showHangar('select');
+    });
+    document.getElementById('btn-victory-menu').addEventListener('click', ()=>{
+      audio.click();
+      this.showMenu();
+    });
+
+    window.addEventListener('orientationchange', ()=> setTimeout(()=>this.checkOrientation(),200));
+  },
+};
+
+/* ---------------- small SVG icon helpers (all original geometric glyphs) ---------------- */
+function shipGlyphSvg(s, size){
+  size = size||46;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 46 46" class="ship-glyph">
+    <polygon points="23,4 33,34 23,27 13,34" fill="${s.color}" opacity="0.9"/>
+    <circle cx="23" cy="16" r="3" fill="#fff" opacity="0.8"/>
+  </svg>`;
+}
+function upgradeIconSvg(kind){
+  const stroke = 'var(--cyan)';
+  const shapes = {
+    hull: `<rect x="7" y="9" width="20" height="16" rx="2" fill="none" stroke="${stroke}" stroke-width="2"/>`,
+    shield: `<path d="M17 4 L28 8 V17 C28 24 23 28 17 30 C11 28 6 24 6 17 V8 Z" fill="none" stroke="${stroke}" stroke-width="2"/>`,
+    engine: `<circle cx="17" cy="17" r="10" fill="none" stroke="${stroke}" stroke-width="2"/><path d="M17 7 V4 M17 30 V27 M7 17 H4 M30 17 H27" stroke="${stroke}" stroke-width="2"/>`,
+    weapon: `<path d="M6 22 L22 6 L28 12 L12 28 Z" fill="none" stroke="${stroke}" stroke-width="2"/>`,
+    fire: `<path d="M17 4 C10 12 8 18 12 24 C9 22 8 26 12 30 C10 26 14 28 17 24 C20 28 24 26 22 30 C26 26 25 22 22 24 C26 18 24 12 17 4 Z" fill="none" stroke="${stroke}" stroke-width="1.6"/>`,
+    target: `<circle cx="17" cy="17" r="10" fill="none" stroke="${stroke}" stroke-width="2"/><circle cx="17" cy="17" r="3" fill="${stroke}"/>`,
+  };
+  return `<svg width="30" height="30" viewBox="0 0 34 34">${shapes[kind]||''}</svg>`;
+}
+
+window.addEventListener('DOMContentLoaded', ()=> Game.init());
+
+</script>
+</body>
+</html>
